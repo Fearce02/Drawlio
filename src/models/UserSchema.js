@@ -22,6 +22,14 @@ const userStats = new mongoose.Schema({
 
 const userSchema = new mongoose.Schema(
   {
+    firstName: {
+      type: String,
+      required: true,
+    },
+    lastName: {
+      type: String,
+      required: true,
+    },
     username: {
       type: String,
       required: true,
@@ -32,7 +40,7 @@ const userSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
-    HashPassword: {
+    password: {
       type: String,
       required: true,
     },
