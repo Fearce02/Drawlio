@@ -28,4 +28,20 @@ export const handleLobbySockets = (io, socket) => {
       },
     });
   });
+
+  socket.on("joinGuestLobby", ({ username }) => {
+    socket.username = username;
+    socket.join("guest-lobby");
+
+    const guestSockets = Array.from(
+      io.sockets.adapter.rooms.get("guest-lobby") || [],
+    );
+    const players = guestSockets
+      .map((id) => {
+        const s = io.sockets.sockets.get(id);
+        return s?.username ? { username: s.username } : null;
+      })
+      .filter(Boolean);
+    io.to("guest-lobby").emit("guestLobbyUpdate", { players });
+  });
 };
