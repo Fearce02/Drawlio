@@ -264,7 +264,10 @@ const AuthPage: React.FC = () => {
   const handleCreateRoom = () => {
     if (validateGuestForm()) {
       const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      localStorage.setItem("guestUsername", guestData.username);
+      localStorage.setItem("roomCode", roomCode);
       console.log("Creating room:", { username: guestData.username, roomCode });
+      navigate("/lobby");
       // Navigate to game with new room
       setShowGuestModal(false);
     }
@@ -279,8 +282,10 @@ const AuthPage: React.FC = () => {
         }));
         return;
       }
+      localStorage.setItem("guestUsername", guestData.username);
+      localStorage.setItem("roomCode", guestData.roomCode.trim().toUpperCase());
       console.log("Joining room:", guestData);
-      // Navigate to game with room code
+      navigate("/lobby");
       setShowGuestModal(false);
     }
   };

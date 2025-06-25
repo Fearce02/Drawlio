@@ -1,27 +1,65 @@
 import React, { useEffect, useState } from "react";
 import MainContent from "./MainContent";
+import Navbar from "../components/ui/Navbar";
+import EditProfile from "./EditProfile";
+import { useNavigate } from "react-router-dom";
+import Lobby from "./Lobby";
 
 const Dashboard: React.FC = () => {
-  const [userStats, setUserStats] = useState<any>(null);
+  //   const [usern, setUser] = useState<any>(null);
+  const [user, setUser] = useState<any>(null);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [showLobby, setShowLobby] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const userRaw = localStorage.getItem("user");
     if (!userRaw) return;
-
-    const user = JSON.parse(userRaw);
+    const u = JSON.parse(userRaw);
 
     const formattedUser = {
-      name: `${user.firstName} ${user.lastName}`,
-      level: user.stats?.level || 1,
-      gamesPlayed: user.stats?.gamesplayed || 0,
-      gamesWon: user.stats?.gamesWon || 0,
+      name: `${u.firstName} ${u.lastName}`,
+      email: u.email,
+      avatar: u.avatar,
+      level: u.stats?.level || 1,
+      gamesPlayed: u.stats?.gamesplayed || 0,
+      gamesWon: u.stats?.gamesWon || 0,
     };
 
-    setUserStats(formattedUser);
+    setUser(formattedUser);
   }, []);
+
+  const handleSignout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/");
+  };
+
+  const handleEditProfile = () => setEditingProfile(true);
+  const handleCancelEdit = () => setEditingProfile(false);
+
+  const handleSaveProfile = (updatedUserFromBackend: any) => {
+    const stats = updatedUserFromBackend.stats || {
+      level: 1,
+      gamesplayed: 0,
+      gamesWon: 0,
+    };
+    const formattedUser = {
+      name: `${updatedUserFromBackend.firstName} ${updatedUserFromBackend.lastName}`,
+      email: updatedUserFromBackend.email,
+      avatar: updatedUserFromBackend.avatar,
+      level: stats.level,
+      gamesPlayed: stats.gamesplayed,
+      gamesWon: stats.gamesWon,
+    };
+    setUser(formattedUser);
+    localStorage.setItem("user", JSON.stringify(updatedUserFromBackend)); // update storage too
+    setEditingProfile(false);
+  };
 
   const handleCreateRoom = () => {
     console.log("Create room clicked!");
+    setShowLobby(true);
     // Navigate or trigger room creation
   };
 
@@ -30,14 +68,36 @@ const Dashboard: React.FC = () => {
     // Navigate or show friends list
   };
 
-  if (!userStats) return <div>Loading...</div>;
+  if (!user) return <div>Loading...</div>;
 
   return (
-    <MainContent
-      user={userStats}
-      onCreateRoom={handleCreateRoom}
-      onViewFriends={handleViewFriends}
-    />
+    <>
+      <Navbar
+        user={user}
+        onSignOut={handleSignout}
+        onEditProfile={handleEditProfile}
+      />
+      <div className="pt-20 px-4">
+        {editingProfile ? (
+          <EditProfile
+            user={user}
+            onSave={handleSaveProfile}
+            onCancel={handleCancelEdit}
+          />
+        ) : (
+          <MainContent
+            user={{
+              name: user.name,
+              level: user.level,
+              gamesPlayed: user.gamesPlayed,
+              gamesWon: user.gamesWon,
+            }}
+            onCreateRoom={() => console.log("Create room clicked")}
+            onViewFriends={() => console.log("View friends clicked")}
+          />
+        )}
+      </div>
+    </>
   );
 };
 

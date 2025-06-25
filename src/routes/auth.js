@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { User } from "../models/UserSchema.js";
 import authenticate from "../middlewares/jwtAuth.js";
+import { success } from "zod/v4";
 
 const router = express.Router();
 
@@ -85,6 +86,72 @@ router.post("/sign-in", async (req, res) => {
       success: false,
       message: "Internal Server Error",
     });
+  }
+});
+
+router.put("/update-profile", authenticate, async (req, res) => {
+  const userId = req.user.id;
+  const { firstName, lastName, username, email, avatar } = req.body;
+
+  try {
+    const user = await User.findById(userId);
+    if (!user)
+      return res.status(400).json({
+        message: "User not found",
+      });
+
+    user.firstName = firstName || user.firstName;
+    user.lastName = lastName || user.lastName;
+    user.username = username || user.username;
+    user.email = email || user.email;
+    user.avatar = avatar || user.avatar;
+
+    await user.save();
+    res.status(200).json({
+      success: true,
+      user: {
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        username: user.username,
+        avatar: user.avatar,
+        stats: user.stats,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Internal Server Error",
+    });
+  }
+});
+
+router.get("/profile", authenticate, async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const user = await User.findById(userId).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      user: {
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        username: user.username,
+        email: user.email,
+        avatar: user.avatar,
+        stats: user.stats,
+      },
+    });
+  } catch (error) {
+    console.error("Error in /me:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
