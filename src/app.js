@@ -16,8 +16,8 @@ const io = new SocketServer(server, {
 app.use(express.json());
 app.use(
   cors({
-    origin: "http://localhost:5173", // your frontend dev server
-    credentials: true, // if you plan to send cookies later
+    origin: "http://localhost:5173", //Frontend Server
+    credentials: true,
   }),
 );
 

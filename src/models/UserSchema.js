@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import { email } from "zod/v4";
 
 const userStats = new mongoose.Schema({
   gamesplayed: {
@@ -58,19 +57,19 @@ const userSchema = new mongoose.Schema(
     friends: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: User,
+        ref: "User",
       },
     ],
     friendRequests: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: User,
+        ref: "User",
       },
     ],
     sentRequests: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: User,
+        ref: "User",
       },
     ],
   },
