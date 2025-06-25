@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { gsap } from "gsap";
 import GoogleIcon from "./GoogleIcon";
+import { useNavigate } from "react-router-dom";
 
 interface FormData {
   firstName: string;
@@ -30,6 +31,8 @@ interface GuestData {
   username: string;
   roomCode: string;
 }
+
+const baseAPI = "http://localhost:8000";
 
 const AuthPage: React.FC = () => {
   const [isSignUp, setIsSignUp] = useState(true);
@@ -48,6 +51,8 @@ const AuthPage: React.FC = () => {
   });
   const [errors, setErrors] = useState<Partial<FormData>>({});
   const [guestErrors, setGuestErrors] = useState<Partial<GuestData>>({});
+
+  const navigate = useNavigate();
 
   // Refs for GSAP animations
   const containerRef = useRef<HTMLDivElement>(null);
@@ -175,8 +180,8 @@ const AuthPage: React.FC = () => {
       newErrors.email = "Email is invalid";
 
     if (!formData.password.trim()) newErrors.password = "Password is required";
-    if (formData.password.length < 6)
-      newErrors.password = "Password must be at least 6 characters";
+    if (formData.password.length < 8)
+      newErrors.password = "Password must be at least 8 characters";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -193,17 +198,57 @@ const AuthPage: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validateForm()) {
-      // Animate button on success
-      gsap.to(e.currentTarget.querySelector('button[type="submit"]'), {
-        scale: 0.95,
-        duration: 0.1,
-        yoyo: true,
-        repeat: 1,
+    const valid = validateForm();
+    if (!valid) return;
+
+    const endpoint = isSignUp ? "/sign-up" : "/sign-in";
+    const url = `${baseAPI}/api/auth${endpoint}`;
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
       });
-      console.log("Form submitted:", formData);
+      const data = await response.json();
+
+      if (!response.ok) {
+        setErrors((prev) => ({
+          ...prev,
+          email: data.message.toLowerCase().includes("email")
+            ? data.message
+            : undefined,
+          username: data.message.toLowerCase().includes("username")
+            ? data.message
+            : undefined,
+          password: data.message.toLowerCase().includes("password")
+            ? data.message
+            : undefined,
+        }));
+        return;
+      }
+      // gsap.to(e.currentTarget.querySelector('button[type="submit"]'), {
+      //   scale: 0.95,
+      //   duration: 0.1,
+      //   yoyo: true,
+      //   repeat: 1,
+      // });
+      if (isSignUp) {
+        console.log("User created!", data.message);
+        setIsSignUp(false);
+      } else {
+        console.log("Signed in:", data);
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("userId", data.userId);
+
+        navigate("/dashboard");
+      }
+    } catch (error) {
+      console.error("Signup Error", error);
+      alert("Something went wrong. Please Try again.");
     }
   };
 
@@ -328,11 +373,10 @@ const AuthPage: React.FC = () => {
 
           <div className="text-center max-w-md">
             <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-[#ffffff] to-[#ebddbe] bg-clip-text text-transparent">
-              Skribble
+              Drawlio!
             </h1>
             <p className="text-xl text-white mb-8 leading-relaxed">
-              Join millions of players in the ultimate drawing and guessing game
-              experience
+              The ultimate drawing and guessing game
             </p>
 
             {/* Game features */}
@@ -344,26 +388,6 @@ const AuthPage: React.FC = () => {
                 <div>
                   <p className="font-semibold text-white">Multiplayer</p>
                   <p className="text-sm text-gray-300">Play with friends</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#ffd166]/20 rounded-lg flex items-center justify-center">
-                  <Palette className="w-5 h-5 text-[#ffffff]" />
-                </div>
-                <div>
-                  <p className="font-semibold text-white">Creative</p>
-                  <p className="text-sm text-gray-300">Express yourself</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#06d6a0]/20 rounded-lg flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-[#06d6a0]" />
-                </div>
-                <div>
-                  <p className="font-semibold text-white">Fun</p>
-                  <p className="text-sm text-gray-300">Endless entertainment</p>
                 </div>
               </div>
 
@@ -443,7 +467,7 @@ const AuthPage: React.FC = () => {
                               ? "border-[#ef476f] focus:border-[#ef476f] bg-red-50"
                               : "border-gray-200 focus:border-[#118ab2] focus:bg-[#118ab2]/5"
                           }`}
-                          placeholder="John"
+                          placeholder="Firstname"
                         />
                       </div>
                       {errors.firstName && (
@@ -469,7 +493,7 @@ const AuthPage: React.FC = () => {
                               ? "border-[#ef476f] focus:border-[#ef476f] bg-red-50"
                               : "border-gray-200 focus:border-[#118ab2] focus:bg-[#118ab2]/5"
                           }`}
-                          placeholder="Doe"
+                          placeholder="Lastname"
                         />
                       </div>
                       {errors.lastName && (

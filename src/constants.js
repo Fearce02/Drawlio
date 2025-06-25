@@ -1,1 +1,1 @@
-export const db_name = "drawlio-db";
+export const db_name = "drawlio";

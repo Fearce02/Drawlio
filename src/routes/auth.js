@@ -1,8 +1,8 @@
 import express from "express";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { User } from "../models/UserSchema";
-import authenticate from "../middlewares/jwtAuth";
+import { User } from "../models/UserSchema.js";
+import authenticate from "../middlewares/jwtAuth.js";
 
 const router = express.Router();
 
@@ -65,6 +65,7 @@ router.post("/sign-in", async (req, res) => {
     const jwtToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "10h",
     });
+    const { firstName, lastName, username, avatar, stats } = user;
     res.json({
       success: true,
       token: jwtToken,
@@ -73,7 +74,7 @@ router.post("/sign-in", async (req, res) => {
         firstName,
         lastName,
         username,
-        email,
+        email: user.email,
         avatar,
         stats,
       },
@@ -81,8 +82,10 @@ router.post("/sign-in", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({
-      sucess: false,
+      success: false,
       message: "Internal Server Error",
     });
   }
 });
+
+export default router;
