@@ -5,13 +5,13 @@ type GuestPlayer = {
 };
 
 type ServerToClientEvents = {
-  playerJoined: (players: { username: string; isHost: boolean }[]) => void;
+  PlayerJoined: (players: { username: string; isHost: boolean }[]) => void;
   gameStarted: (data: { message: string }) => void;
   guestLobbyUpdate: (data: { players: GuestPlayer[] }) => void;
 };
 
 type ClientToServerEvents = {
-  joinRoom: (data: { username: string; roomCode: string }) => void;
+  join_lobby: (data: { username: string; roomCode: string }) => void;
   startGame: (data: { roomCode: string }) => void;
   joinGuestLobby: (data: { username: string }) => void;
 };

@@ -56,52 +56,52 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
   const onlineFriends = friends.filter((friend) => friend.status === "online");
   const guestUsername = localStorage.getItem("guestUsername") || "Guest";
 
-  useEffect(() => {
-    // Page entrance animations
-    if (headerRef.current) {
-      slideInFromLeft(headerRef.current, 0.1);
-    }
+  // useEffect(() => {
+  //   // Page entrance animations
+  //   if (headerRef.current) {
+  //     slideInFromLeft(headerRef.current, 0.1);
+  //   }
 
-    if (settingsRef.current) {
-      fadeInUp(settingsRef.current, 0.3);
-    }
+  //   if (settingsRef.current) {
+  //     fadeInUp(settingsRef.current, 0.3);
+  //   }
 
-    if (friendsRef.current) {
-      slideInFromRight(friendsRef.current, 0.5);
-    }
+  //   if (friendsRef.current) {
+  //     slideInFromRight(friendsRef.current, 0.5);
+  //   }
 
-    if (createButtonRef.current) {
-      gsap.fromTo(
-        createButtonRef.current,
-        { opacity: 0, y: 50, scale: 0.8 },
-        {
-          opacity: 1,
-          y: 0,
-          scale: 1,
-          duration: 0.8,
-          delay: 0.7,
-          ease: "back.out(1.7)",
-        },
-      );
-    }
+  //   if (createButtonRef.current) {
+  //     gsap.fromTo(
+  //       createButtonRef.current,
+  //       { opacity: 0, y: 50, scale: 0.8 },
+  //       {
+  //         opacity: 1,
+  //         y: 0,
+  //         scale: 1,
+  //         duration: 0.8,
+  //         delay: 0.7,
+  //         ease: "back.out(1.7)",
+  //       },
+  //     );
+  //   }
 
-    // Animate form elements
-    staggerFadeIn(".form-group", 0.8);
-  }, []);
+  //   // Animate form elements
+  //   staggerFadeIn(".form-group", 0.8);
+  // }, []);
 
   useEffect(() => {
     const username = localStorage.getItem("guestUsername") || "Guest";
 
-    socket.emit("joinRoom", { roomCode, username });
+    socket.emit("join_lobby", { roomCode, username });
 
-    socket.on("playerJoined", (users) => {
-      setPlayers(users);
+    socket.on("PlayerJoined", (users) => {
+      setPlayers(users.map((p: any) => p.username));
       console.log("Current players:", users); // You can setPlayers() here
     });
 
     return () => {
-      socket.emit("leave_lobby", { roomCode, username });
-      socket.off("lobby_users");
+      // socket.emit("leave_lobby", { roomCode, username });
+      socket.off("PlayerJoined");
     };
   }, [roomCode]);
 
@@ -150,7 +150,7 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
     console.log("Creating room with settings:", roomSettings);
     console.log("Invited friends:", selectedFriends);
 
-    socket.emit("start_game", { roomCode });
+    socket.emit("startGame", { roomCode });
 
     // Success animation
     if (createButtonRef.current) {
@@ -405,12 +405,32 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
               <Users className="w-7 h-7 text-white" />
             </div>
             <h2 className="text-2xl font-bold text-[#073b4c]">
-              Invite Friends
+              Player's in Lobby
             </h2>
           </div>
 
           <div className="space-y-4">
-            {onlineFriends.length === 0 ? (
+            {players.length === 0 ? (
+              <p className="text-gray-500 text-center py-12 text-lg">
+                Waiting for other players to join...
+              </p>
+            ) : (
+              players.map((player, index) => (
+                <div
+                  key={index}
+                  className="flex items-center space-x-4 p-4 rounded-2xl bg-gray-100"
+                >
+                  <div className="w-12 h-12 bg-[#06d6a0] rounded-full flex items-center justify-center text-white font-bold">
+                    {player.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-[#073b4c]">{player}</p>
+                    <p className="text-sm text-[#06d6a0]">Online</p>
+                  </div>
+                </div>
+              ))
+            )}
+            {/* {onlineFriends.length === 0 ? (
               <p className="text-gray-500 text-center py-12 text-lg">
                 No friends are currently online
               </p>
@@ -454,7 +474,7 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
                   )}
                 </div>
               ))
-            )}
+            )} */}
           </div>
 
           {selectedFriends.length > 0 && (
@@ -470,14 +490,7 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
           )}
         </div>
       </div>
-      <div>
-        <h2 className="text-xl font-semibold mb-2">Players in Lobby</h2>
-        <ul className="list-disc pl-5 text-white">
-          {players.map((player, index) => (
-            <li key={index}>{player}</li>
-          ))}
-        </ul>
-      </div>
+
       {/* Create Button */}
       <div className="mt-12 flex justify-center">
         <button

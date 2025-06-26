@@ -129,7 +129,6 @@ router.put("/update-profile", authenticate, async (req, res) => {
 
 router.get("/profile", authenticate, async (req, res) => {
   const userId = req.user.id;
-
   try {
     const user = await User.findById(userId).select("-password");
 
