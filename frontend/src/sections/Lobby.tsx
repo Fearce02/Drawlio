@@ -8,6 +8,8 @@ import { gsap } from "gsap";
 //   staggerFadeIn,
 // } from "../hooks/useGSAP";
 import socket from "../sockets/socket";
+import { useNavigate } from "react-router-dom";
+import type { Player } from "../types/game";
 
 interface Friend {
   id: number;
@@ -21,6 +23,14 @@ interface CreateRoomProps {
   onBack: () => void;
 }
 
+interface LobbySettings {
+  maxPlayers: number;
+  roundDuration: number;
+  isPrivate: boolean;
+  password: string;
+  totalRounds: number;
+}
+
 const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
   const [roomSettings, setRoomSettings] = useState({
     name: "",
@@ -30,8 +40,8 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
     isPrivate: false,
     password: "",
   });
-
-  const [players, setPlayers] = useState<string[]>([]); //players in lobby
+  const navigate = useNavigate();
+  const [players, setPlayers] = useState<Player[]>([]); //players in lobby
   const roomCode = useRef(
     localStorage.getItem("roomCode") ||
       Math.random().toString(36).substring(2, 8).toUpperCase(),
@@ -85,8 +95,14 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
     socket.emit("join_lobby", { roomCode, username });
 
     socket.on("PlayerJoined", (users) => {
-      setPlayers(users.map((p: any) => p.username));
-      console.log("Current players:", users); // You can setPlayers() here
+      const parsedPlayers = users.map((p: any) => ({
+        id: p.socketId || p.id,
+        name: p.username || p.name,
+        score: p.score ?? 0,
+        isConnected: p.isConnected ?? true,
+        isDrawing: p.isDrawing ?? false,
+      }));
+      setPlayers(parsedPlayers);
     });
 
     socket.on("HostAssigned", ({ host }) => {
@@ -102,12 +118,23 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
       }
     });
 
+    socket.on("GameStarted", ({ message }) => {
+      navigate("/game", {
+        state: {
+          players,
+          settings: roomSettings,
+          host,
+        },
+      });
+    });
+
     return () => {
       socket.off("PlayerJoined");
       socket.off("HostAssigned");
       socket.off("lobbySettingsUpdated");
+      socket.off("GameStarted");
     };
-  }, [roomCode]);
+  }, [roomCode, navigate, players, host, roomSettings]);
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(roomCode);
@@ -155,6 +182,10 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
     if (isHost) {
       socket.emit("updateSettings", { roomCode, settings: updated });
     }
+  };
+
+  const handleStartGame = () => {
+    socket.emit("startGame", { roomCode });
   };
 
   return (
@@ -338,18 +369,18 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
                 Waiting for other players to join...
               </p>
             ) : (
-              players.map((player, index) => (
+              players.map((player) => (
                 <div
-                  key={index}
+                  key={player.id}
                   className="flex items-center space-x-4 p-4 rounded-2xl bg-gray-100"
                 >
                   <div className="w-12 h-12 bg-[#06d6a0] rounded-full flex items-center justify-center text-white font-bold">
-                    {player.charAt(0).toUpperCase()}
+                    {player.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1">
                     <p className="font-bold text-[#073b4c]">
-                      {player}{" "}
-                      {player === host && (
+                      {player.name}{" "}
+                      {player.name === host && (
                         <span className="text-yellow-400">
                           {" "}
                           <Crown className="w-3 h-3" />
@@ -369,7 +400,7 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
       <div className="mt-12 flex justify-center">
         <button
           ref={createButtonRef}
-          onClick={handleCreateGameRoom}
+          onClick={handleStartGame}
           disabled={!roomSettings.name.trim()}
           className="bg-[#ef476f] text-white px-16 py-5 rounded-full font-bold text-xl hover:bg-[#e63946] transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg"
           onMouseEnter={(e) => {
