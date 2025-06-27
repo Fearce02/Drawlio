@@ -1,8 +1,8 @@
 import { io, Socket } from "socket.io-client";
 
-type GuestPlayer = {
-  username: string;
-};
+// type GuestPlayer = {
+//   username: string;
+// };
 
 type ServerToClientEvents = {
   PlayerJoined: (players: { username: string; isHost: boolean }[]) => void;
