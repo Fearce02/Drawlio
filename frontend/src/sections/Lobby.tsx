@@ -8,6 +8,7 @@ import {
   EyeOff,
   Copy,
   Check,
+  Crown,
 } from "lucide-react";
 import { gsap } from "gsap";
 // import {
@@ -48,6 +49,7 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
   ).current;
   const [showPassword, setShowPassword] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [host, setHost] = useState<string | null>(null);
 
   const headerRef = useRef<HTMLDivElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
@@ -55,6 +57,7 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
   const createButtonRef = useRef<HTMLButtonElement>(null);
   const onlineFriends = friends.filter((friend) => friend.status === "online");
   const guestUsername = localStorage.getItem("guestUsername") || "Guest";
+  const isHost = guestUsername == host;
 
   // useEffect(() => {
   //   // Page entrance animations
@@ -99,9 +102,23 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
       console.log("Current players:", users); // You can setPlayers() here
     });
 
+    socket.on("HostAssigned", ({ host }) => {
+      setHost(host);
+    });
+
+    socket.on("lobbySettingsUpdated", (settings) => {
+      if (settings && typeof settings === "object") {
+        setRoomSettings((prev) => ({
+          ...prev,
+          ...settings,
+        }));
+      }
+    });
+
     return () => {
-      // socket.emit("leave_lobby", { roomCode, username });
       socket.off("PlayerJoined");
+      socket.off("HostAssigned");
+      socket.off("lobbySettingsUpdated");
     };
   }, [roomCode]);
 
@@ -148,7 +165,6 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
 
   const handleCreateRoom = () => {
     console.log("Creating room with settings:", roomSettings);
-    console.log("Invited friends:", selectedFriends);
 
     socket.emit("startGame", { roomCode });
 
@@ -177,6 +193,18 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
         repeat: 1,
         ease: "power2.inOut",
       });
+    }
+  };
+
+  const handleSettingsChange = (
+    field: keyof typeof roomSettings,
+    value: any,
+  ) => {
+    const updated = { ...roomSettings, [field]: value };
+    setRoomSettings(updated);
+
+    if (isHost) {
+      socket.emit("updateSettings", { roomCode, settings: updated });
     }
   };
 
@@ -227,10 +255,11 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
                 <input
                   type="text"
                   value={roomSettings.name}
+                  disabled={!isHost}
                   onChange={(e) =>
                     setRoomSettings({ ...roomSettings, name: e.target.value })
                   }
-                  placeholder="My Awesome Drawing Room"
+                  placeholder="Drawlio-Room-1"
                   className="w-full px-6 py-4 border-2 border-gray-200 rounded-full focus:outline-none focus:border-[#118ab2] text-lg transition-all duration-300 focus:scale-105"
                   onFocus={(e) => {
                     gsap.to(e.currentTarget, { scale: 1.02, duration: 0.3 });
@@ -248,6 +277,7 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
                 </label>
                 <div className="flex items-center space-x-4">
                   <input
+                    disabled={!isHost}
                     type="text"
                     value={roomCode}
                     readOnly
@@ -274,6 +304,7 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
                     Max Players
                   </label>
                   <select
+                    disabled={!isHost}
                     value={roomSettings.maxPlayers}
                     onChange={(e) =>
                       setRoomSettings({
@@ -296,6 +327,7 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
                     Rounds
                   </label>
                   <select
+                    disabled={!isHost}
                     value={roomSettings.rounds}
                     onChange={(e) =>
                       setRoomSettings({
@@ -318,6 +350,7 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
                     Draw Time
                   </label>
                   <select
+                    disabled={!isHost}
                     value={roomSettings.drawTime}
                     onChange={(e) =>
                       setRoomSettings({
@@ -344,6 +377,7 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
                       Private Room
                     </span>
                     <button
+                      disabled={!isHost}
                       onClick={handleToggleSwitch}
                       className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all duration-300 ${
                         roomSettings.isPrivate ? "bg-[#06d6a0]" : "bg-gray-300"
@@ -424,57 +458,20 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
                     {player.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1">
-                    <p className="font-bold text-[#073b4c]">{player}</p>
+                    <p className="font-bold text-[#073b4c]">
+                      {player}{" "}
+                      {player === host && (
+                        <span className="text-yellow-400">
+                          {" "}
+                          <Crown className="w-3 h-3" />
+                        </span>
+                      )}
+                    </p>
                     <p className="text-sm text-[#06d6a0]">Online</p>
                   </div>
                 </div>
               ))
             )}
-            {/* {onlineFriends.length === 0 ? (
-              <p className="text-gray-500 text-center py-12 text-lg">
-                No friends are currently online
-              </p>
-            ) : (
-              onlineFriends.map((friend, index) => (
-                <div
-                  key={friend.id}
-                  data-friend-id={friend.id}
-                  className={`flex items-center space-x-4 p-4 rounded-2xl cursor-pointer transition-all duration-300 transform hover:scale-105 ${
-                    selectedFriends.includes(friend.id)
-                      ? "bg-[#06d6a0] text-white"
-                      : "hover:bg-gray-100"
-                  }`}
-                  onClick={() => toggleFriend(friend.id)}
-                  style={{ animationDelay: `${index * 0.1}s` }}
-                >
-                  <div className="relative">
-                    <img
-                      src={friend.avatar}
-                      alt={friend.name}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#06d6a0] border-2 border-white rounded-full animate-pulse"></div>
-                  </div>
-                  <div className="flex-1">
-                    <p
-                      className={`font-bold ${selectedFriends.includes(friend.id) ? "text-white" : "text-[#073b4c]"}`}
-                    >
-                      {friend.name}
-                    </p>
-                    <p
-                      className={`text-sm ${selectedFriends.includes(friend.id) ? "text-emerald-100" : "text-[#06d6a0]"}`}
-                    >
-                      Online
-                    </p>
-                  </div>
-                  {selectedFriends.includes(friend.id) && (
-                    <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
-                      <Check className="w-5 h-5 text-[#06d6a0]" />
-                    </div>
-                  )}
-                </div>
-              ))
-            )} */}
           </div>
 
           {selectedFriends.length > 0 && (

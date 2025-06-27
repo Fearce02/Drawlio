@@ -6,14 +6,15 @@ type GuestPlayer = {
 
 type ServerToClientEvents = {
   PlayerJoined: (players: { username: string; isHost: boolean }[]) => void;
-  gameStarted: (data: { message: string }) => void;
-  guestLobbyUpdate: (data: { players: GuestPlayer[] }) => void;
+  HostAssigned: (data: { host: string }) => void;
+  lobbySettingsUpdated: (settings: any) => void;
+  GameStarted: (data: { message: string }) => void;
 };
 
 type ClientToServerEvents = {
   join_lobby: (data: { username: string; roomCode: string }) => void;
   startGame: (data: { roomCode: string }) => void;
-  joinGuestLobby: (data: { username: string }) => void;
+  updateSettings: (data: { roomCode: string; settings: object }) => void;
 };
 
 const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(
