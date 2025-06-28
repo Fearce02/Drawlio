@@ -39,12 +39,10 @@ export const handleLobbySockets = (io, socket) => {
     const room = guestRooms[roomCode];
 
     if (!room.players.some((p) => p.username === username)) {
-      room.players.push({ socketId: socket.id, username, score: 0 });
+      room.players.push({ socketId: socket.id, username });
     } else {
       room.players = room.players.map((p) =>
-        p.username === username
-          ? { ...p, socketId: socket.id, score: p.score || 0 }
-          : p,
+        p.username === username ? { ...p, socketId: socket.id } : p,
       );
     }
 
@@ -68,7 +66,7 @@ export const handleLobbySockets = (io, socket) => {
     io.to(socket.id).emit("lobbySettingsUpdated", room.settings);
   });
 
-  socket.on("updateSettings", ({ roomCode, settings }) => {
+  socket.on("updateSettings", (roomCode, settings) => {
     const room = guestRooms[roomCode];
     if (!room) return;
 
@@ -119,7 +117,7 @@ export const handleLobbySockets = (io, socket) => {
         advanceTurn(io, roomCode);
       }, 2000);
     } else {
-      io.to(roomCode).emit("ChatMessage", {
+      io.to(roomCode).emit("ChatUpdate", {
         username: socket.data.username,
         message,
         isCorrect: false,
@@ -158,10 +156,6 @@ export const handleLobbySockets = (io, socket) => {
         break;
       }
     }
-  });
-
-  socket.on("joinGameRoom", ({ roomCode, username }) => {
-    // Implementation of joinGameRoom event handler
   });
 };
 

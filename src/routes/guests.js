@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 
 const router = express.Router();
 
-router.post("join-game", async (req, res) => {
+router.post("/join-game", async (req, res) => {
   const { username, roomCode } = req.body;
 
   if (!username) return res.status(400).json({ error: "Username is required" });

@@ -6,11 +6,13 @@ import { gsap } from "gsap";
 interface GameHeaderProps {
   gameState: GameState;
   playerCount: number;
+  isCurrentPlayerDrawing: boolean;
 }
 
 export const GameHeader: React.FC<GameHeaderProps> = ({
   gameState,
   playerCount,
+  isCurrentPlayerDrawing,
 }) => {
   const headerRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<HTMLSpanElement>(null);
@@ -88,16 +90,18 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
         </div>
 
         <div className="flex items-center space-x-4">
-          {gameState.currentWord && gameState.gamePhase === "drawing" && (
-            <div
-              ref={wordRef}
-              className="bg-gradient-to-r from-blue-50 to-purple-50 px-4 py-2 rounded-lg border border-blue-200"
-            >
-              <span className="text-blue-700 font-medium">
-                Word: {gameState.currentWord}
-              </span>
-            </div>
-          )}
+          {isCurrentPlayerDrawing &&
+            gameState.currentWord &&
+            gameState.gamePhase === "drawing" && (
+              <div
+                ref={wordRef}
+                className="bg-gradient-to-r from-blue-50 to-purple-50 px-4 py-2 rounded-lg border border-blue-200"
+              >
+                <span className="text-blue-700 font-medium">
+                  Word: {gameState.currentWord}
+                </span>
+              </div>
+            )}
 
           <div className="flex items-center space-x-2">
             <Clock className="w-5 h-5 text-red-500" />

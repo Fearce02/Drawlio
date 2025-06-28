@@ -3,7 +3,6 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { User } from "../models/UserSchema.js";
 import authenticate from "../middlewares/jwtAuth.js";
-import { success } from "zod/v4";
 
 const router = express.Router();
 

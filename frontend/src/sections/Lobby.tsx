@@ -176,11 +176,20 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
     field: keyof typeof roomSettings,
     value: any,
   ) => {
+    if (field === "name" && typeof value !== "string") return;
     const updated = { ...roomSettings, [field]: value };
     setRoomSettings(updated);
 
     if (isHost) {
-      socket.emit("updateSettings", { roomCode, settings: updated });
+      // Map frontend settings to backend format
+      const backendSettings = {
+        maxPlayers: updated.maxPlayers,
+        totalRounds: updated.rounds,
+        roundDuration: updated.drawTime,
+        isPrivate: updated.isPrivate,
+        password: updated.password,
+      };
+      socket.emit("updateSettings", { roomCode, settings: backendSettings });
     }
   };
 
@@ -236,9 +245,7 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
                   type="text"
                   value={roomSettings.name}
                   disabled={!isHost}
-                  onChange={(e) =>
-                    setRoomSettings({ ...roomSettings, name: e.target.value })
-                  }
+                  onChange={(e) => handleSettingsChange("name", e.target.value)}
                   placeholder="Drawlio-Room-1"
                   className="w-full px-6 py-4 border-2 border-gray-200 rounded-full focus:outline-none focus:border-[#118ab2] text-lg transition-all duration-300 focus:scale-105"
                   onFocus={(e) => {
@@ -287,14 +294,14 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
                     disabled={!isHost}
                     value={roomSettings.maxPlayers}
                     onChange={(e) =>
-                      setRoomSettings({
-                        ...roomSettings,
-                        maxPlayers: parseInt(e.target.value),
-                      })
+                      handleSettingsChange(
+                        "maxPlayers",
+                        parseInt(e.target.value),
+                      )
                     }
                     className="w-full px-6 py-4 border-2 border-gray-200 rounded-full focus:outline-none focus:border-[#118ab2] text-lg transition-all duration-300 focus:scale-105"
                   >
-                    {[4, 6, 8, 10, 12].map((num) => (
+                    {[2, 4, 6, 8, 10, 12].map((num) => (
                       <option key={num} value={num}>
                         {num} players
                       </option>
@@ -310,10 +317,7 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
                     disabled={!isHost}
                     value={roomSettings.rounds}
                     onChange={(e) =>
-                      setRoomSettings({
-                        ...roomSettings,
-                        rounds: parseInt(e.target.value),
-                      })
+                      handleSettingsChange("rounds", parseInt(e.target.value))
                     }
                     className="w-full px-6 py-4 border-2 border-gray-200 rounded-full focus:outline-none focus:border-[#118ab2] text-lg transition-all duration-300 focus:scale-105"
                   >
@@ -333,10 +337,7 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
                     disabled={!isHost}
                     value={roomSettings.drawTime}
                     onChange={(e) =>
-                      setRoomSettings({
-                        ...roomSettings,
-                        drawTime: parseInt(e.target.value),
-                      })
+                      handleSettingsChange("drawTime", parseInt(e.target.value))
                     }
                     className="w-full px-6 py-4 border-2 border-gray-200 rounded-full focus:outline-none focus:border-[#118ab2] text-lg transition-all duration-300 focus:scale-105"
                   >
@@ -401,7 +402,9 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
         <button
           ref={createButtonRef}
           onClick={handleStartGame}
-          disabled={!roomSettings.name.trim()}
+          disabled={
+            typeof roomSettings.name !== "string" || !roomSettings.name.trim()
+          }
           className="bg-[#ef476f] text-white px-16 py-5 rounded-full font-bold text-xl hover:bg-[#e63946] transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg"
           onMouseEnter={(e) => {
             if (!e.currentTarget.disabled) {

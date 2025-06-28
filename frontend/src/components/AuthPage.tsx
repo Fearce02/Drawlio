@@ -242,7 +242,7 @@ const AuthPage: React.FC = () => {
       } else {
         console.log("Signed in:", data);
         localStorage.setItem("token", data.token);
-        localStorage.setItem("userId", data.userId);
+        localStorage.setItem("userId", data.user.id);
         localStorage.setItem("user", JSON.stringify(data.user));
 
         navigate("/dashboard");
