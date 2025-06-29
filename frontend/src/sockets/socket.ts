@@ -9,7 +9,12 @@ type ServerToClientEvents = {
   guestLobbyUpdate: (data: { players: { username: string }[] }) => void;
   HostAssigned: (data: { host: string }) => void;
   lobbySettingsUpdated: (settings: any) => void;
-  GameStarted: (data: { message: string }) => void;
+  GameStarted: (data: {
+    message: string;
+    drawer: any;
+    round: number;
+    time: any;
+  }) => void;
 
   NewTurn: (data: {
     drawer: string;

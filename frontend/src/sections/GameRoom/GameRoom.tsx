@@ -1,4 +1,10 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, {
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  useMemo,
+} from "react";
 import { GameHeader } from "./GameHeader";
 import { DrawingCanvas } from "./DrawingCanvas";
 import { DrawingToolbar } from "./DrawingToolbar";
@@ -34,7 +40,9 @@ export const GameRoom: React.FC = () => {
 
   const currentPlayerName = localStorage.getItem("guestUsername") || "Guest";
   const roomCode = localStorage.getItem("roomCode") || "";
-  const isCurrentPlayerDrawing = gameState.currentDrawer === currentPlayerName;
+  const isCurrentPlayerDrawing = useMemo(() => {
+    return gameState.currentDrawer === currentPlayerName;
+  }, [gameState.currentDrawer, currentPlayerName]);
 
   // Debug game state changes
   useEffect(() => {
@@ -144,26 +152,29 @@ export const GameRoom: React.FC = () => {
   );
 
   useEffect(() => {
-    socket.on("GameStarted", ({ message }) => {
-      console.log("[GameStarted] received:", message);
-      setGameState((prev) => ({
-        ...prev,
-        isActive: true,
-        gamePhase: "waiting",
-      }));
+    // socket.on("GameStarted", ({ message, drawer, round, time }) => {
+    //   console.log("[GameStarted] received:", message);
+    //   setGameState((prev) => ({
+    //     ...prev,
+    //     isActive: true,
+    //     gamePhase: "drawing",
+    //     currentDrawer: drawer,
+    //     currentRound: round,
+    //     timeLeft: time,
+    //   }));
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          playerId: "system",
-          playerName: "System",
-          message: "🎮 Game started! The first drawer will be selected...",
-          timestamp: Date.now(),
-          isSystemMessage: true,
-        },
-      ]);
-    });
+    //   setMessages((prev) => [
+    //     ...prev,
+    //     {
+    //       id: Date.now().toString(),
+    //       playerId: "system",
+    //       playerName: "System",
+    //       message: "🎮 Game started! The first drawer will be selected...",
+    //       timestamp: Date.now(),
+    //       isSystemMessage: true,
+    //     },
+    //   ]);
+    // });
 
     socket.on("GameState", (data) => {
       console.log("[GameState] received:", data);
@@ -216,6 +227,16 @@ export const GameRoom: React.FC = () => {
       ]);
     });
 
+    socket.on("WordToDraw", (word: string) => {
+      console.log("[WordToDraw] received:", word);
+      console.log("[WordToDraw] Current player:", currentPlayerName);
+      setGameState((prev) => ({
+        ...prev,
+        currentWord: word,
+        gamePhase: "drawing",
+      }));
+    });
+
     socket.on("drawing", ({ imageData }: { imageData: string }) => {
       console.log("[Drawing received] imageData length:", imageData.length);
       const canvas = canvasRef.current;
@@ -230,19 +251,6 @@ export const GameRoom: React.FC = () => {
         };
         img.src = imageData;
       }
-    });
-
-    socket.on("WordToDraw", (word) => {
-      console.log("[WordToDraw] received:", word);
-      console.log("[WordToDraw] Current player:", currentPlayerName);
-      console.log(
-        "[WordToDraw] Is current player drawing:",
-        isCurrentPlayerDrawing,
-      );
-      setGameState((prev) => ({
-        ...prev,
-        currentWord: word,
-      }));
     });
 
     socket.on("CorrectGuess", ({ username, message }) => {

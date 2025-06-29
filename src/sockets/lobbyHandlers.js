@@ -1,5 +1,3 @@
-import { GameRoom } from "../models/GameRoom.js";
-
 const guestRooms = {};
 const words = [
   "Elephant",
@@ -8,6 +6,22 @@ const words = [
   "Dragon",
   "Mountain",
   "Tornado",
+  "F1",
+  "Ferrari",
+  "Football",
+  "Basketball",
+  "Computer",
+  "Giraffe",
+  "Chocolate",
+  "Rainbow",
+  "Volcano",
+  "Robot",
+  "Castle",
+  "Pirate",
+  "Mermaid",
+  "Treasure",
+  "Galaxy",
+  "Jungle",
 ];
 
 export const handleLobbySockets = (io, socket) => {
@@ -33,6 +47,8 @@ export const handleLobbySockets = (io, socket) => {
           currentWord: null,
           timer: null,
         },
+        joinedPlayers: [],
+        _gameStarted: false,
       };
     }
 
@@ -47,12 +63,6 @@ export const handleLobbySockets = (io, socket) => {
           : p,
       );
     }
-
-    if (room.host === username) {
-      room.host = username;
-    }
-
-    const players = room.players.map((p) => ({ username: p.username }));
 
     io.to(roomCode).emit(
       "PlayerJoined",
@@ -70,10 +80,7 @@ export const handleLobbySockets = (io, socket) => {
 
   socket.on("updateSettings", ({ roomCode, settings }) => {
     const room = guestRooms[roomCode];
-    if (!room) return;
-
-    if (socket.data.username !== room.host) return;
-
+    if (!room || socket.data.username !== room.host) return;
     room.settings = settings;
     io.to(roomCode).emit("lobbySettingsUpdated", settings);
   });
@@ -86,13 +93,48 @@ export const handleLobbySockets = (io, socket) => {
     room.gameState.isActive = true;
     room.gameState.currentRound = 1;
     room.gameState.drawerIndex = 0;
+    room.joinedPlayers = [];
+    room._gameStarted = false;
 
+    // const drawer = room.players[room.gameState.drawerIndex];
+    // const roundDuration = room.settings.roundDuration;
     io.to(roomCode).emit("GameStarted", {
-      message: "Game Has Started",
-      settings: room.settings,
+      message: "Game has started",
     });
-    console.log("[startGame] Using settings:", room.settings);
-    startNextTurn(io, roomCode);
+
+    // io.to(roomCode).emit("GameStarted", {
+    //   message: "Game Has Started",
+    //   settings: room.settings,
+    //   drawer: drawer.username,
+    //   round: 1,
+    //   time: roundDuration,
+    // });
+    // console.log("[startGame] Using settings:", room.settings);
+    // startNextTurn(io, roomCode);
+  });
+
+  socket.on("joinGameRoom", ({ roomCode, username }) => {
+    console.log(
+      `[joinGameRoom] ${username} (${socket.id}) joined game room: ${roomCode}`,
+    );
+    socket.join(roomCode);
+    socket.data.username = username;
+
+    const room = guestRooms[roomCode];
+    if (!room) return;
+    if (!room.joinedPlayers.includes(username)) {
+      room.joinedPlayers.push(username);
+    }
+
+    const allJoined = room.joinedPlayers.length === room.players.length;
+
+    if (allJoined && !room._gameStarted) {
+      room._gameStarted = true;
+      console.log(
+        `[joinGameRoom] All players joined. Starting game for room: ${roomCode}`,
+        startNextTurn(io, roomCode),
+      );
+    }
   });
 
   socket.on("drawing", ({ roomCode, imageData }) => {
@@ -142,7 +184,9 @@ export const handleLobbySockets = (io, socket) => {
         if (room.players.length === 0) {
           delete guestRooms[roomCode];
         } else {
-          const players = room.players.map((p) => ({ username: p.username }));
+          const players = room.players.map((p) => ({
+            username: p.username,
+          }));
           io.to(roomCode).emit(
             "PlayerJoined",
             room.players.map((p) => ({
@@ -158,10 +202,6 @@ export const handleLobbySockets = (io, socket) => {
         break;
       }
     }
-  });
-
-  socket.on("joinGameRoom", ({ roomCode, username }) => {
-    // Implementation of joinGameRoom event handler
   });
 };
 
@@ -190,7 +230,6 @@ function startNextTurn(io, roomCode) {
   gameState.currentWord = word;
 
   console.log(`[startNextTurn] Emitting WordToDraw to: ${drawer.socketId}`);
-  io.to(drawer.socketId).emit("WordToDraw", word);
   io.to(roomCode).emit("NewTurn", {
     drawer: drawer.username,
     maskedWord: maskWord(gameState.currentWord),
@@ -198,6 +237,10 @@ function startNextTurn(io, roomCode) {
     totalRounds: room.settings.totalRounds,
     time: room.settings.roundDuration,
   });
+  setTimeout(() => {
+    io.to(drawer.socketId).emit("WordToDraw", word);
+  }, 100);
+
   console.log(`[startNextTurn] Emitting NewTurn to room: ${roomCode}`);
 
   gameState.timer = setTimeout(() => {
