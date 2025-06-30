@@ -46,6 +46,7 @@ export const handleLobbySockets = (io, socket) => {
           drawerIndex: 0,
           currentWord: null,
           timer: null,
+          totalTurns: 0,
         },
         joinedPlayers: [],
         _gameStarted: false,
@@ -95,6 +96,7 @@ export const handleLobbySockets = (io, socket) => {
     room.gameState.drawerIndex = 0;
     room.joinedPlayers = [];
     room._gameStarted = false;
+    room.gameState.totalTurns = 0;
 
     // const drawer = room.players[room.gameState.drawerIndex];
     // const roundDuration = room.settings.roundDuration;
@@ -145,21 +147,56 @@ export const handleLobbySockets = (io, socket) => {
     const room = guestRooms[roomCode];
     if (!room || !room.gameState.currentWord) return;
 
+    const gameState = room.gameState;
+    const now = Date.now();
+    const player = room.players.find((p) => p.socketId === socket.id);
+    if (
+      !player ||
+      room.gameState.playersGuessedCorrectly.includes(player.username)
+    )
+      return;
+
     const isCorrect =
       message.trim().toLowerCase() === room.gameState.currentWord.toLowerCase();
     if (isCorrect) {
-      const guesser = room.players.find((p) => p.socketId === socket.id);
-      if (guesser) guesser.score += 10;
+      const timeElapsed = (now - gameState.roundStartTime) / 1000;
+      const timeLeft = Math.max(0, room.settings.roundDuration - timeElapsed);
+
+      let score = 0;
+      if (timeLeft > 50) score = 100;
+      else if (timeLeft > 30) score = 70;
+      else if (timeLeft > 10) score = 40;
+      else score = 20;
+
+      player.score += score;
+      room.gameState.playersGuessedCorrectly.push(player.username);
 
       io.to(roomCode).emit("CorrectGuess", {
-        username: guesser.username,
+        username: player.username,
         message,
+        score,
       });
 
-      clearTimeout(room.gameState.timer);
-      setTimeout(() => {
-        advanceTurn(io, roomCode);
-      }, 2000);
+      const nonDrawers = room.players.filter(
+        (p) => p.username !== room.players[room.gameState.drawerIndex].username,
+      );
+
+      const allGuessed = nonDrawers.every((p) =>
+        room.gameState.playersGuessedCorrectly.includes(p.username),
+      );
+
+      if (allGuessed) {
+        clearTimeout(room.gameState.timer);
+        setTimeout(() => {
+          advanceTurn(io, roomCode);
+        }, 2000);
+      } else {
+        io.to(roomCode).emit("ChatMessage", {
+          username: socket.data.username,
+          message,
+          isCorrect: false,
+        });
+      }
     } else {
       io.to(roomCode).emit("ChatMessage", {
         username: socket.data.username,
@@ -229,6 +266,8 @@ function startNextTurn(io, roomCode) {
   console.log(`[startNextTurn] Word selected: ${word}`);
   gameState.currentWord = word;
 
+  gameState.playersGuessedCorrectly = [];
+  gameState.roundStartTime = Date.now();
   console.log(`[startNextTurn] Emitting WordToDraw to: ${drawer.socketId}`);
   io.to(roomCode).emit("NewTurn", {
     drawer: drawer.username,
@@ -248,14 +287,86 @@ function startNextTurn(io, roomCode) {
   }, room.settings.roundDuration * 1000);
 }
 
+// function advanceTurn(io, roomCode) {
+//   const room = guestRooms[roomCode];
+//   if (!room) return;
+
+//   const gamestate = room.gameState;
+//   const numPlayers = room.players.length;
+
+//   gamestate.drawerIndex = (gamestate.drawerIndex + 1) % numPlayers;
+
+//   // if (gamestate.drawerIndex === 0) {
+//   //   gamestate.currentRound++;
+//   // }
+
+//   // if (gamestate.currentRound > room.settings.totalRounds) {
+//   //   io.to(roomCode).emit("GameOver", {
+//   //     message: "Game Over!",
+//   //     players: room.players.map((p) => ({
+//   //       username: p.username,
+//   //       score: p.score,
+//   //     })),
+//   //   });
+//   //   gamestate.isActive = false;
+//   //   return;
+//   // }
+
+//   gamestate.totalTurns++;
+
+//   const totalDrawerTurnsAllowed =
+//     room.settings.totalRounds * room.players.length;
+
+//   if (gamestate.totalTurns >= totalDrawerTurnsAllowed) {
+//     io.to(roomCode).emit("GameOver", {
+//       message: "Game Over!",
+//       players: room.players.map((p) => ({
+//         username: p.username,
+//         score: p.score,
+//       })),
+//     });
+//     gamestate.isActive = false;
+//     return;
+//   }
+
+//   gamestate.drawerIndex = (gamestate.drawerIndex + 1) % room.players.length;
+//   if (gamestate.drawerIndex === 0) {
+//     gamestate.currentRound++;
+//   }
+//   startNextTurn(io, roomCode);
+// }
+
 function advanceTurn(io, roomCode) {
   const room = guestRooms[roomCode];
   if (!room) return;
 
-  room.gameState.drawerIndex =
-    (room.gameState.drawerIndex + 1) % room.players.length;
-  if (room.gameState.drawerIndex === 0) {
-    room.gameState.currentRound++;
+  const gamestate = room.gameState;
+  const numPlayers = room.players.length;
+
+  // ⬇️ Increment turn count (used for game over check)
+  gamestate.totalTurns++;
+
+  const totalDrawerTurnsAllowed = room.settings.totalRounds * numPlayers;
+
+  // 🛑 Game over after all turns
+  if (gamestate.totalTurns >= totalDrawerTurnsAllowed) {
+    io.to(roomCode).emit("GameOver", {
+      message: "Game Over!",
+      players: room.players.map((p) => ({
+        username: p.username,
+        score: p.score,
+      })),
+    });
+    gamestate.isActive = false;
+    return;
+  }
+
+  // ✅ Advance drawer correctly
+  gamestate.drawerIndex = (gamestate.drawerIndex + 1) % numPlayers;
+
+  // ✅ If we've cycled back to first player, it’s a new round
+  if (gamestate.drawerIndex === 0) {
+    gamestate.currentRound++;
   }
 
   startNextTurn(io, roomCode);

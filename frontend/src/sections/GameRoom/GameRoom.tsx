@@ -363,7 +363,7 @@ export const GameRoom: React.FC = () => {
           </div>
 
           {/* Right Column - Chat */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 h-full overflow-hidden">
             <ChatBox
               messages={messages}
               onSendMessage={handleSendMessage}

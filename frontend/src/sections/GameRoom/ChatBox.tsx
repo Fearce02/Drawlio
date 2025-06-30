@@ -111,7 +111,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
   return (
     <div
       ref={chatBoxRef}
-      className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col h-full transform"
+      className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden"
     >
       <div className="p-4 border-b border-gray-200">
         <h3 className="font-semibold text-gray-800 flex items-center">
@@ -122,7 +122,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
 
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0 max-h-96"
+        className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0"
         style={{ maxHeight: "400px" }}
       >
         {messages.length === 0 ? (
@@ -130,7 +130,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
             <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
               <MessageCircle className="w-8 h-8 text-gray-300" />
             </div>
-            <p>No messages yet. Start guessing!</p>
+            <p>Start guessing!</p>
           </div>
         ) : (
           messages.map((message, index) => (
