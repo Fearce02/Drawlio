@@ -113,7 +113,11 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
       if (settings && typeof settings === "object") {
         setRoomSettings((prev) => ({
           ...prev,
-          ...settings,
+          maxPlayers: settings.maxPlayers ?? prev.maxPlayers,
+          rounds: settings.totalRounds ?? prev.rounds,
+          drawTime: settings.roundDuration ?? prev.drawTime,
+          isPrivate: settings.isPrivate ?? prev.isPrivate,
+          password: settings.password ?? prev.password,
         }));
       }
     });
