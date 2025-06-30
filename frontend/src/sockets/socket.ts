@@ -24,7 +24,12 @@ type ServerToClientEvents = {
     time: number;
   }) => void;
 
-  drawing: (data: { imageData: string }) => void;
+  drawing: (data: {
+    from: { x: number; y: number };
+    to: { x: number; y: number };
+    color: string;
+    brushSize: number;
+  }) => void;
 
   WordToDraw: (word: string) => void;
 
@@ -51,7 +56,13 @@ type ClientToServerEvents = {
   joinGameRoom: (data: { username: string; roomCode: string }) => void;
   startGame: (data: { roomCode: string }) => void;
   updateSettings: (data: { roomCode: string; settings: object }) => void;
-  drawing: (data: { roomCode: string; imageData: string }) => void;
+  drawing: (data: {
+    roomCode: string;
+    from: { x: number; y: number };
+    to: { x: number; y: number };
+    color: string;
+    brushSize: number;
+  }) => void;
   sendGuess: (data: { roomCode: string; message: string }) => void;
 };
 

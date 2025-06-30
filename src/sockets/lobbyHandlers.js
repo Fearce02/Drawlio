@@ -139,8 +139,8 @@ export const handleLobbySockets = (io, socket) => {
     }
   });
 
-  socket.on("drawing", ({ roomCode, imageData }) => {
-    io.to(roomCode).emit("drawing", { imageData });
+  socket.on("drawing", ({ roomCode, from, to, color, brushSize }) => {
+    io.to(roomCode).emit("drawing", { from, to, color, brushSize });
   });
 
   socket.on("sendGuess", ({ roomCode, message }) => {

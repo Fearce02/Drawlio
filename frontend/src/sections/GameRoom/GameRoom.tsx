@@ -36,7 +36,6 @@ export const GameRoom: React.FC = () => {
 
   const gameRoomRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const currentPlayerName = localStorage.getItem("guestUsername") || "Guest";
   const roomCode = localStorage.getItem("roomCode") || "";
@@ -67,6 +66,17 @@ export const GameRoom: React.FC = () => {
     }
   }, []);
 
+  const drawLine = (ctx, from, to, color = "black", width = 2) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineCap = "round";
+
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+  };
+
   // Auto-start game when entering GameRoom
   useEffect(() => {
     console.log("[GameRoom] Component mounted, attempting to join game room");
@@ -81,17 +91,17 @@ export const GameRoom: React.FC = () => {
   }, [roomCode, currentPlayerName]);
 
   // Initialize canvas when component mounts
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        // Set white background
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-    }
-  }, []);
+  // useEffect(() => {
+  //   const canvas = canvasRef.current;
+  //   if (canvas) {
+  //     const ctx = canvas.getContext("2d");
+  //     if (ctx) {
+  //       // Set white background
+  //       ctx.fillStyle = "#ffffff";
+  //       ctx.fillRect(0, 0, canvas.width, canvas.height);
+  //     }
+  //   }
+  // }, []);
 
   useEffect(() => {
     if (gridRef.current) {
@@ -152,30 +162,6 @@ export const GameRoom: React.FC = () => {
   );
 
   useEffect(() => {
-    // socket.on("GameStarted", ({ message, drawer, round, time }) => {
-    //   console.log("[GameStarted] received:", message);
-    //   setGameState((prev) => ({
-    //     ...prev,
-    //     isActive: true,
-    //     gamePhase: "drawing",
-    //     currentDrawer: drawer,
-    //     currentRound: round,
-    //     timeLeft: time,
-    //   }));
-
-    //   setMessages((prev) => [
-    //     ...prev,
-    //     {
-    //       id: Date.now().toString(),
-    //       playerId: "system",
-    //       playerName: "System",
-    //       message: "🎮 Game started! The first drawer will be selected...",
-    //       timestamp: Date.now(),
-    //       isSystemMessage: true,
-    //     },
-    //   ]);
-    // });
-
     socket.on("GameState", (data) => {
       console.log("[GameState] received:", data);
       setGameState((prev) => ({
@@ -237,21 +223,26 @@ export const GameRoom: React.FC = () => {
       }));
     });
 
-    socket.on("drawing", ({ imageData }: { imageData: string }) => {
-      console.log("[Drawing received] imageData length:", imageData.length);
-      const canvas = canvasRef.current;
-      if (canvas && !isCurrentPlayerDrawing) {
-        const ctx = canvas.getContext("2d");
-        const img = new Image();
-        img.onload = () => {
-          if (ctx) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0);
-          }
-        };
-        img.src = imageData;
-      }
-    });
+    // socket.on("drawing", ({ from, to, color, brushSize }) => {
+    //   const canvas = canvasRef.current;
+    //   if (!canvas || isCurrentPlayerDrawing) return;
+
+    //   const ctx = canvas.getContext("2d");
+    //   if (ctx) {
+    //     drawLine(ctx, from, to, color, brushSize);
+    //   }
+    //   // if (canvas || !isCurrentPlayerDrawing) {
+    //   //   const ctx = canvas.getContext("2d");
+    //   //   const img = new Image();
+    //   //   img.onload = () => {
+    //   //     if (ctx) {
+    //   //       ctx.clearRect(0, 0, canvas.width, canvas.height);
+    //   //       ctx.drawImage(img, 0, 0);
+    //   //     }
+    //   //   };
+    //   //   img.src = imageData;
+    //   // }
+    // });
 
     socket.on("CorrectGuess", ({ username, message }) => {
       setMessages((prev) => [
@@ -306,16 +297,6 @@ export const GameRoom: React.FC = () => {
     };
   }, []);
 
-  const handleDrawingChange = useCallback(
-    (imageData: string) => {
-      if (isCurrentPlayerDrawing && roomCode) {
-        console.log("[Drawing emit] Sending drawing update.");
-        socket.emit("drawing", { roomCode, imageData });
-      }
-    },
-    [isCurrentPlayerDrawing, roomCode],
-  );
-
   return (
     <div
       ref={gameRoomRef}
@@ -343,12 +324,11 @@ export const GameRoom: React.FC = () => {
           {/* Center Column - Canvas and Tools */}
           <div className="lg:col-span-2 space-y-4">
             <DrawingCanvas
-              isDrawing={isCurrentPlayerDrawing}
+              isCurrentPlayerDrawing={isCurrentPlayerDrawing}
               currentTool={currentTool}
               currentColor={currentColor}
               brushSize={brushSize}
-              onDrawingChange={handleDrawingChange}
-              canvasRef={canvasRef}
+              // onDrawingChange={handleDrawingChange}
             />
 
             <DrawingToolbar
