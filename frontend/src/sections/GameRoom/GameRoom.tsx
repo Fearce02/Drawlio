@@ -83,7 +83,6 @@ export const GameRoom: React.FC = () => {
     console.log("[GameRoom] Room code:", roomCode);
     console.log("[GameRoom] Current player:", currentPlayerName);
 
-    // Emit joinGameRoom to join the game room
     if (roomCode) {
       console.log("[GameRoom] Emitting joinGameRoom event");
       socket.emit("joinGameRoom", { roomCode, username: currentPlayerName });
@@ -222,27 +221,6 @@ export const GameRoom: React.FC = () => {
         gamePhase: "drawing",
       }));
     });
-
-    // socket.on("drawing", ({ from, to, color, brushSize }) => {
-    //   const canvas = canvasRef.current;
-    //   if (!canvas || isCurrentPlayerDrawing) return;
-
-    //   const ctx = canvas.getContext("2d");
-    //   if (ctx) {
-    //     drawLine(ctx, from, to, color, brushSize);
-    //   }
-    //   // if (canvas || !isCurrentPlayerDrawing) {
-    //   //   const ctx = canvas.getContext("2d");
-    //   //   const img = new Image();
-    //   //   img.onload = () => {
-    //   //     if (ctx) {
-    //   //       ctx.clearRect(0, 0, canvas.width, canvas.height);
-    //   //       ctx.drawImage(img, 0, 0);
-    //   //     }
-    //   //   };
-    //   //   img.src = imageData;
-    //   // }
-    // });
 
     socket.on("CorrectGuess", ({ username, message }) => {
       setMessages((prev) => [

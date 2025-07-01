@@ -143,6 +143,10 @@ export const handleLobbySockets = (io, socket) => {
     io.to(roomCode).emit("drawing", { from, to, color, brushSize });
   });
 
+  socket.on("clearCanvas", ({ roomCode }) => {
+    io.to(roomCode).emit("clearCanvas");
+  });
+
   socket.on("sendGuess", ({ roomCode, message }) => {
     const room = guestRooms[roomCode];
     if (!room || !room.gameState.currentWord) return;
@@ -269,6 +273,9 @@ function startNextTurn(io, roomCode) {
   gameState.playersGuessedCorrectly = [];
   gameState.roundStartTime = Date.now();
   console.log(`[startNextTurn] Emitting WordToDraw to: ${drawer.socketId}`);
+
+  io.to(roomCode).emit("clearCanvas");
+
   io.to(roomCode).emit("NewTurn", {
     drawer: drawer.username,
     maskedWord: maskWord(gameState.currentWord),

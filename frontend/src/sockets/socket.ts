@@ -15,7 +15,6 @@ type ServerToClientEvents = {
     round: number;
     time: any;
   }) => void;
-
   NewTurn: (data: {
     drawer: string;
     maskedWord: string;
@@ -23,22 +22,17 @@ type ServerToClientEvents = {
     totalRounds: number;
     time: number;
   }) => void;
-
   drawing: (data: {
     from: { x: number; y: number };
     to: { x: number; y: number };
     color: string;
     brushSize: number;
   }) => void;
-
+  clearCanvas: (roomCode: any) => void;
   WordToDraw: (word: string) => void;
-
   CorrectGuess: (data: { username: string; message: string }) => void;
-
   ChatMessage: (data: { username: string; message: string }) => void;
-
   GameOver: (data: { players: { username: string; score: number }[] }) => void;
-
   GameState: (data: {
     isActive: boolean;
     currentRound: number;
@@ -63,6 +57,7 @@ type ClientToServerEvents = {
     color: string;
     brushSize: number;
   }) => void;
+  clearCanvas: (roomCode: any) => void;
   sendGuess: (data: { roomCode: string; message: string }) => void;
 };
 

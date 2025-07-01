@@ -32,8 +32,8 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   const initializeCanvas = () => {
     const canvas = canvasRef.current;
     if (canvas) {
-      canvas.width = 800;
-      canvas.height = 500;
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
       const ctx = canvas.getContext("2d");
       if (ctx) {
         ctx.fillStyle = "#ffffff";
@@ -52,36 +52,58 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     }
   }, [isCurrentPlayerDrawing]);
 
-  const clearCanvas = () => {
+  const clearCanvas = (emit = true) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const ctx = canvas.getContext("2d");
-    if (ctx) {
-      gsap.to(canvas, {
-        scale: 0.95,
-        duration: 0.2,
-        ease: "power2.inOut",
-        yoyo: true,
-        repeat: 1,
-        onComplete: () => {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-        },
-      });
+    if (!ctx) return;
+
+    // Animate the clear effect
+    gsap.to(canvas, {
+      scale: 0.95,
+      duration: 0.2,
+      ease: "power2.inOut",
+      yoyo: true,
+      repeat: 1,
+      onComplete: () => {
+        // Clear the canvas after animation
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      },
+    });
+
+    // Emit the clear event to other players
+    if (emit && isCurrentPlayerDrawing) {
+      socket.emit("clearCanvas", { roomCode });
     }
   };
 
   const getMousePos = (
     e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
   ): Point => {
-    const rect = canvasRef.current!.getBoundingClientRect();
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
     return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
     };
   };
+
+  useEffect(() => {
+    socket.on("clearCanvas", () => {
+      clearCanvas(false);
+    });
+    return () => {
+      socket.off("clearCanvas");
+    };
+  }, []);
 
   const drawLine = (
     from: Point,
@@ -168,7 +190,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         <h3 className="font-semibold text-gray-800">Drawing Canvas</h3>
         {isCurrentPlayerDrawing && (
           <button
-            onClick={clearCanvas}
+            onClick={() => clearCanvas(true)}
             className="px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
           >
             Clear
