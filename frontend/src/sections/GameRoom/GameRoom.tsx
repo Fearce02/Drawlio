@@ -13,7 +13,8 @@ import { PlayerList } from "./PlayerList";
 import type { Player, ChatMessage, GameState } from "../../types/game";
 import socket from "../../sockets/socket";
 import { gsap } from "gsap";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { GameOver } from "./GameOver";
 
 export const GameRoom: React.FC = () => {
   const location = useLocation();
@@ -43,6 +44,10 @@ export const GameRoom: React.FC = () => {
     return gameState.currentDrawer === currentPlayerName;
   }, [gameState.currentDrawer, currentPlayerName]);
 
+  const navigate = useNavigate();
+  const [finalPlayers, setFinalPlayers] = useState<Player[]>([]);
+  const [playAgainVotes, setPlayAgainVotes] = useState(0);
+
   // Debug game state changes
   useEffect(() => {
     console.log("[GameState] Updated:", {
@@ -66,7 +71,13 @@ export const GameRoom: React.FC = () => {
     }
   }, []);
 
-  const drawLine = (ctx, from, to, color = "black", width = 2) => {
+  const drawLine = (
+    ctx: CanvasRenderingContext2D,
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    color = "black",
+    width = 2,
+  ) => {
     ctx.strokeStyle = color;
     ctx.lineWidth = width;
     ctx.lineCap = "round";
@@ -255,12 +266,28 @@ export const GameRoom: React.FC = () => {
     });
 
     socket.on("GameOver", ({ players }) => {
-      const leaderboard = players
-        .sort((a, b) => b.score - a.score)
-        .map((p, i) => `${i + 1}. ${p.username} - ${p.score} pts`)
-        .join("\n");
+      // Map backend player objects to frontend Player type
+      const mappedPlayers = players.map((p: any, i: number) => ({
+        id: p.id || p.socketId || p.username || `player-${i}`,
+        name: p.name || p.username,
+        score: p.score ?? 0,
+        isDrawing: p.isDrawing ?? false,
+        isConnected: p.isConnected ?? true,
+      }));
+      setFinalPlayers(mappedPlayers);
+      setGameState((prev) => ({
+        ...prev,
+        gamePhase: "finished",
+      }));
+    });
 
-      alert("🎉 Game Over!\n\n" + leaderboard);
+    socket.on("playAgainVote", (data: { votes: number; total: number }) => {
+      const { votes, total } = data;
+      setPlayAgainVotes(votes);
+      // If all players voted, navigate to lobby
+      if (votes === players.length) {
+        navigate("/guest-lobby");
+      }
     });
 
     return () => {
@@ -272,8 +299,35 @@ export const GameRoom: React.FC = () => {
       socket.off("CorrectGuess");
       socket.off("ChatMessage");
       socket.off("GameOver");
+      socket.off("playAgainVote");
     };
-  }, []);
+  }, [players.length, navigate, currentPlayerName]);
+
+  const handlePlayAgain = () => {
+    socket.emit("playAgain", { roomCode });
+    // Optionally show a waiting message/modal until all players vote
+  };
+
+  const handleExit = () => {
+    navigate("/");
+  };
+
+  if (gameState.gamePhase === "finished") {
+    return (
+      <GameOver
+        players={finalPlayers.map((p) => ({
+          id: p.id,
+          username: p.name, // GameOver expects username
+          score: p.score,
+          isCurrentPlayer: p.name === currentPlayerName,
+        }))}
+        onPlayAgain={handlePlayAgain}
+        onExit={handleExit}
+        totalRounds={gameState.maxRounds}
+        currentPlayerName={currentPlayerName}
+      />
+    );
+  }
 
   return (
     <div

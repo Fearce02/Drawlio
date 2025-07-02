@@ -244,6 +244,41 @@ export const handleLobbySockets = (io, socket) => {
       }
     }
   });
+
+  // Add playAgainVotes to each room
+  socket.on("playAgain", ({ roomCode }) => {
+    const room = guestRooms[roomCode];
+    if (!room) return;
+    if (!room.playAgainVotes) room.playAgainVotes = [];
+    const username = socket.data.username;
+    if (!room.playAgainVotes.includes(username)) {
+      room.playAgainVotes.push(username);
+    }
+    io.to(roomCode).emit("playAgainVote", {
+      votes: room.playAgainVotes.length,
+      total: room.players.length,
+    });
+    // If all players have voted, reset game state and send everyone to lobby
+    if (room.playAgainVotes.length === room.players.length) {
+      // Reset game state (or you can start a new game here)
+      room.gameState = {
+        isActive: false,
+        currentRound: 0,
+        drawerIndex: 0,
+        currentWord: null,
+        timer: null,
+        totalTurns: 0,
+      };
+      room.playAgainVotes = [];
+      // Optionally, reset scores or keep them
+      // room.players.forEach(p => p.score = 0);
+      io.to(roomCode).emit("playAgainVote", {
+        votes: room.players.length,
+        total: room.players.length,
+      });
+      // You can also emit a custom event to tell frontend to go to lobby
+    }
+  });
 };
 
 function startNextTurn(io, roomCode) {
@@ -371,7 +406,7 @@ function advanceTurn(io, roomCode) {
   // ✅ Advance drawer correctly
   gamestate.drawerIndex = (gamestate.drawerIndex + 1) % numPlayers;
 
-  // ✅ If we've cycled back to first player, it’s a new round
+  // ✅ If we've cycled back to first player, it's a new round
   if (gamestate.drawerIndex === 0) {
     gamestate.currentRound++;
   }

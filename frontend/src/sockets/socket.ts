@@ -32,7 +32,7 @@ type ServerToClientEvents = {
   WordToDraw: (word: string) => void;
   CorrectGuess: (data: { username: string; message: string }) => void;
   ChatMessage: (data: { username: string; message: string }) => void;
-  GameOver: (data: { players: { username: string; score: number }[] }) => void;
+  GameOver: (data: { players: any[] }) => void;
   GameState: (data: {
     isActive: boolean;
     currentRound: number;
@@ -42,6 +42,7 @@ type ServerToClientEvents = {
     currentDrawer: string | null;
     gamePhase: string;
   }) => void;
+  playAgainVote: (data: { votes: number; total: number }) => void;
 };
 
 type ClientToServerEvents = {
@@ -59,6 +60,7 @@ type ClientToServerEvents = {
   }) => void;
   clearCanvas: (roomCode: any) => void;
   sendGuess: (data: { roomCode: string; message: string }) => void;
+  playAgain: (data: { roomCode: string }) => void;
 };
 
 const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(

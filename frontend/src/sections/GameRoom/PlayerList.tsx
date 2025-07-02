@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from "react";
-import { Crown, Pencil, Users, Trophy } from "lucide-react";
+import { Crown, Pencil, Users, Trophy, User } from "lucide-react";
 import type { Player } from "../../types/game";
 import { gsap } from "gsap";
 
@@ -15,6 +15,9 @@ export const PlayerList: React.FC<PlayerListProps> = ({
   const playerListRef = useRef<HTMLDivElement>(null);
   const playersContainerRef = useRef<HTMLDivElement>(null);
   const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
+
+  // Get current player name from localStorage
+  const currentPlayerName = localStorage.getItem("guestUsername") || "Guest";
 
   useEffect(() => {
     if (playerListRef.current) {
@@ -83,7 +86,7 @@ export const PlayerList: React.FC<PlayerListProps> = ({
             data-player-id={player.id}
             className={`flex items-center justify-between p-3 rounded-lg border transition-all duration-300 transform hover:scale-105 hover:shadow-md ${
               player.id === currentDrawerId
-                ? "bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200 shadow-md"
+                ? "bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-500 shadow-xl ring-2 ring-blue-300"
                 : player.isConnected
                   ? "bg-gradient-to-r from-gray-50 to-gray-100 border-gray-200 hover:from-gray-100 hover:to-gray-200"
                   : "bg-gradient-to-r from-red-50 to-pink-50 border-red-200"
@@ -116,16 +119,26 @@ export const PlayerList: React.FC<PlayerListProps> = ({
 
               <div>
                 <div className="flex items-center space-x-2">
-                  <span className="font-medium text-gray-800">
+                  <span className="font-medium text-gray-800 flex items-center">
                     {player.name}
+                    {player.id === currentDrawerId && (
+                      <Pencil className="w-4 h-4 ml-1 text-blue-500 animate-pulse" />
+                    )}
                   </span>
+                  {player.name === currentPlayerName && (
+                    <span className="flex items-center text-xs bg-blue-500 text-white px-2 py-1 rounded-full border border-blue-600 ml-1">
+                      <User className="w-3 h-3 mr-1" />
+                      You
+                    </span>
+                  )}
                   {index === 0 && (
                     <span className="text-xs bg-gradient-to-r from-yellow-100 to-yellow-200 text-yellow-800 px-2 py-1 rounded-full border border-yellow-300">
                       Leader
                     </span>
                   )}
                   {player.id === currentDrawerId && (
-                    <span className="text-xs bg-gradient-to-r from-green-100 to-green-200 text-green-800 px-2 py-1 rounded-full border border-green-300 animate-pulse">
+                    <span className="flex items-center text-xs bg-green-500 text-white px-2 py-1 rounded-full border border-green-600 animate-pulse ml-1">
+                      <Pencil className="w-3 h-3 mr-1" />
                       Drawing
                     </span>
                   )}
