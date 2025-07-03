@@ -5,6 +5,7 @@ import { Server as SocketServer } from "socket.io";
 import { createServer } from "http";
 import authRoutes from "./routes/auth.js";
 import cors from "cors";
+import friendsRoutes from "./routes/friends.js";
 
 const app = express();
 const server = createServer(app);
@@ -23,6 +24,7 @@ app.use(
 
 app.use("/api/auth", authRoutes);
 app.use("/api/rooms", guestRoutes);
+app.use("/api/friends", friendsRoutes);
 
 io.on("connection", (socket) => {
   console.log("User has connected", socket.id);

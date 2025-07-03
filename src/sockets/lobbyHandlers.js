@@ -1,3 +1,5 @@
+import { User } from "../models/UserSchema.js";
+
 const guestRooms = {};
 const words = [
   "Elephant",
@@ -210,7 +212,43 @@ export const handleLobbySockets = (io, socket) => {
     }
   });
 
-  socket.on("disconnect", () => {
+  socket.on("user_online", async ({ userId }) => {
+    if (!userId) return;
+    socket.data.userId = userId;
+    try {
+      await User.findByIdAndUpdate(userId, { status: "online" });
+      // Notify all friends
+      const user = await User.findById(userId).populate("friends", "_id");
+      if (user && user.friends) {
+        user.friends.forEach((friend) => {
+          io.to(friend._id.toString()).emit("friend_status_update", {
+            userId,
+            status: "online",
+          });
+        });
+      }
+      // Join a personal room for this user for direct events
+      socket.join(userId);
+    } catch {}
+  });
+
+  socket.on("disconnect", async () => {
+    const userId = socket.data.userId;
+    if (userId) {
+      try {
+        await User.findByIdAndUpdate(userId, { status: "offline" });
+        // Notify all friends
+        const user = await User.findById(userId).populate("friends", "_id");
+        if (user && user.friends) {
+          user.friends.forEach((friend) => {
+            io.to(friend._id.toString()).emit("friend_status_update", {
+              userId,
+              status: "offline",
+            });
+          });
+        }
+      } catch {}
+    }
     for (const roomCode in guestRooms) {
       const room = guestRooms[roomCode];
       const index = room.players.findIndex((p) => p.socketId === socket.id);

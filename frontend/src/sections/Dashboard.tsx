@@ -63,8 +63,7 @@ const Dashboard: React.FC = () => {
   };
 
   const handleViewFriends = () => {
-    console.log("View friends clicked!");
-    // Navigate or show friends list
+    navigate("/friends");
   };
 
   if (!user) return <div>Loading...</div>;
@@ -92,7 +91,7 @@ const Dashboard: React.FC = () => {
               gamesWon: user.gamesWon,
             }}
             onCreateRoom={() => console.log("Create room clicked")}
-            onViewFriends={() => console.log("View friends clicked")}
+            onViewFriends={handleViewFriends}
           />
         )}
       </div>
