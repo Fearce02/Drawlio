@@ -92,7 +92,7 @@ const Navbar: React.FC<NavbarProps> = ({ user, onSignOut, onEditProfile }) => {
               <Palette className="logo-icon w-7 h-7 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-[#073b4c] transition-colors duration-300 hover:text-[#ef476f]">
-              SkribblePlay
+              Drawlio
             </h1>
           </div>
 

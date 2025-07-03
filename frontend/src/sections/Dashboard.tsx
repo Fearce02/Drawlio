@@ -3,7 +3,6 @@ import MainContent from "./MainContent";
 import Navbar from "../components/ui/Navbar";
 import EditProfile from "./EditProfile";
 import { useNavigate } from "react-router-dom";
-import Lobby from "./Lobby";
 
 const Dashboard: React.FC = () => {
   //   const [usern, setUser] = useState<any>(null);
