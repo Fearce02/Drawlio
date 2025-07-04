@@ -81,6 +81,17 @@ export const handleLobbySockets = (io, socket) => {
     io.to(socket.id).emit("lobbySettingsUpdated", room.settings);
   });
 
+  socket.on("guest_lobby_chat", ({ roomCode, username, message }) => {
+    if (!roomCode || !username || !message) return;
+    const timestamp = Date.now();
+    io.to(roomCode).emit("guest_lobby_chat", {
+      roomCode,
+      username,
+      message,
+      timestamp,
+    });
+  });
+
   socket.on("updateSettings", ({ roomCode, settings }) => {
     const room = guestRooms[roomCode];
     if (!room || socket.data.username !== room.host) return;
@@ -229,6 +240,25 @@ export const handleLobbySockets = (io, socket) => {
       }
       // Join a personal room for this user for direct events
       socket.join(userId);
+      // Store username for message handling
+      socket.data.username = user.username;
+    } catch {}
+  });
+
+  socket.on("user_offline", async ({ userId }) => {
+    if (!userId) return;
+    try {
+      await User.findByIdAndUpdate(userId, { status: "offline" });
+      // Notify all friends
+      const user = await User.findById(userId).populate("friends", "_id");
+      if (user && user.friends) {
+        user.friends.forEach((friend) => {
+          io.to(friend._id.toString()).emit("friend_status_update", {
+            userId,
+            status: "offline",
+          });
+        });
+      }
     } catch {}
   });
 
@@ -315,6 +345,56 @@ export const handleLobbySockets = (io, socket) => {
         total: room.players.length,
       });
       // You can also emit a custom event to tell frontend to go to lobby
+    }
+  });
+
+  // Direct messaging between friends
+  socket.on("sendDirectMessage", async ({ recipientId, message }) => {
+    if (!recipientId || !message) return;
+    try {
+      // Get sender's username from socket data or user object
+      let senderUsername = socket.data.username;
+      if (!senderUsername && socket.data.userId) {
+        const user = await User.findById(socket.data.userId);
+        senderUsername = user?.username || "Unknown";
+      }
+
+      // For now, just emit the message to the recipient
+      // In a full implementation, you'd store this in a database
+      io.to(recipientId).emit("chatMessage", {
+        id: Date.now().toString(),
+        username: senderUsername,
+        message: message.message,
+        timestamp: new Date(),
+        type: "direct",
+        recipient: message.recipient,
+      });
+    } catch (error) {
+      console.error("Error sending direct message:", error);
+    }
+  });
+
+  // Lobby chat messages
+  socket.on("sendChatMessage", async ({ roomCode, message }) => {
+    if (!roomCode || !message) return;
+    try {
+      // Get sender's username from socket data or user object
+      let senderUsername = socket.data.username;
+      if (!senderUsername && socket.data.userId) {
+        const user = await User.findById(socket.data.userId);
+        senderUsername = user?.username || "Unknown";
+      }
+
+      // Broadcast to all users in the room
+      io.to(roomCode).emit("chatMessage", {
+        id: Date.now().toString(),
+        username: senderUsername,
+        message: message.message,
+        timestamp: new Date(),
+        type: "message",
+      });
+    } catch (error) {
+      console.error("Error sending chat message:", error);
     }
   });
 };

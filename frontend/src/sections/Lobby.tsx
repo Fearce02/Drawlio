@@ -9,7 +9,8 @@ import { gsap } from "gsap";
 // } from "../hooks/useGSAP";
 import socket from "../sockets/socket";
 import { useNavigate } from "react-router-dom";
-import type { Player } from "../types/game";
+import type { Player, ChatMessage } from "../types/game";
+import LobbyChat from "./LobbyChat";
 
 interface Friend {
   id: number;
@@ -356,6 +357,9 @@ const Lobby: React.FC<CreateRoomProps> = ({ friends, onBack }) => {
             </div>
           </div>
         </div>
+
+        {/*LobbyChat for guest lobby chat */}
+        <LobbyChat roomCode={roomCode} username={guestUsername} />
 
         {/*Guest Lobby list */}
         <div ref={friendsRef} className="bg-white rounded-3xl p-8 shadow-lg">

@@ -43,6 +43,21 @@ type ServerToClientEvents = {
     gamePhase: string;
   }) => void;
   playAgainVote: (data: { votes: number; total: number }) => void;
+  guest_lobby_chat: (data: {
+    roomCode: string;
+    username: string;
+    message: string;
+    timestamp: number;
+  }) => void;
+  chatMessage: (data: {
+    id: string;
+    username: string;
+    message: string;
+    timestamp: Date;
+    type: "message" | "direct";
+    recipient?: string;
+  }) => void;
+  friend_status_update: (data: { userId: string; status: string }) => void;
 };
 
 type ClientToServerEvents = {
@@ -61,6 +76,14 @@ type ClientToServerEvents = {
   clearCanvas: (roomCode: any) => void;
   sendGuess: (data: { roomCode: string; message: string }) => void;
   playAgain: (data: { roomCode: string }) => void;
+  user_offline: (data: { userId: string }) => void;
+  guest_lobby_chat: (data: {
+    roomCode: string;
+    username: string;
+    message: string;
+  }) => void;
+  sendDirectMessage: (data: { recipientId: string; message: any }) => void;
+  sendChatMessage: (data: { roomCode: string; message: any }) => void;
 };
 
 const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(

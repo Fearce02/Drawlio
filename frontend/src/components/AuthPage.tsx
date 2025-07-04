@@ -129,6 +129,16 @@ const AuthPage: React.FC = () => {
     }
   }, [showGuestModal]);
 
+  useEffect(() => {
+    // Redirect to dashboard if already signed in (not guest)
+    const token = localStorage.getItem("token");
+    const userRaw = localStorage.getItem("user");
+    const guestUsername = localStorage.getItem("guestUsername");
+    if (token && userRaw && !guestUsername) {
+      navigate("/dashboard");
+    }
+  }, [navigate]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({

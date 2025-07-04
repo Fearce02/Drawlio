@@ -3,6 +3,8 @@ import MainContent from "./MainContent";
 import Navbar from "../components/ui/Navbar";
 import EditProfile from "./EditProfile";
 import { useNavigate } from "react-router-dom";
+import socket from "../sockets/socket";
+import FriendsChat from "./FriendsSection/FriendsChat";
 
 const Dashboard: React.FC = () => {
   //   const [usern, setUser] = useState<any>(null);
@@ -29,6 +31,21 @@ const Dashboard: React.FC = () => {
   }, []);
 
   const handleSignout = () => {
+    const userRaw = localStorage.getItem("user");
+    let userId = null;
+    if (userRaw) {
+      try {
+        const u = JSON.parse(userRaw);
+        if (u && u.id) {
+          userId = u.id;
+        } else if (u && u._id) {
+          userId = u._id;
+        }
+      } catch {}
+    }
+    if (userId) {
+      (socket as any).emit("user_offline", { userId });
+    }
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     navigate("/");
@@ -68,6 +85,23 @@ const Dashboard: React.FC = () => {
 
   if (!user) return <div>Loading...</div>;
 
+  // Only show FriendsChat if not a guest
+  const userRaw = localStorage.getItem("user");
+  const guestUsername = localStorage.getItem("guestUsername");
+  let userId = null;
+  let username = null;
+  if (userRaw) {
+    try {
+      const u = JSON.parse(userRaw);
+      userId = u.id || u._id;
+      username = u.username || u.email || user.name;
+      // Clear guestUsername if user is registered (has userId)
+      if (userId && guestUsername) {
+        localStorage.removeItem("guestUsername");
+      }
+    } catch {}
+  }
+
   return (
     <>
       <Navbar
@@ -95,6 +129,23 @@ const Dashboard: React.FC = () => {
           />
         )}
       </div>
+      {/* FriendsChat floating chat for signed-in users only */}
+      <div
+        style={{
+          position: "fixed",
+          bottom: 0,
+          right: 0,
+          zIndex: 9999,
+          background: "red",
+          color: "white",
+          padding: "8px",
+        }}
+      >
+        DEBUG MARKER
+      </div>
+      {!guestUsername && userId && username && (
+        <FriendsChat roomCode={"dashboard"} username={username} />
+      )}
     </>
   );
 };
