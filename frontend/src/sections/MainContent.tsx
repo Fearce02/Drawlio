@@ -1,5 +1,14 @@
-import React from "react";
-import { Plus, Users, Trophy, Clock, Star, Play } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import {
+  Plus,
+  Users,
+  Trophy,
+  Clock,
+  Star,
+  Play,
+  AlertCircle,
+} from "lucide-react";
+import socket from "../sockets/socket";
 
 interface MainContentProps {
   user: {
@@ -10,14 +19,77 @@ interface MainContentProps {
   };
   onCreateRoom: () => void;
   onViewFriends: () => void;
+  onJoinRoom: (roomCode: string) => void;
 }
 
 const MainContent: React.FC<MainContentProps> = ({
   user,
   onCreateRoom,
   onViewFriends,
+  onJoinRoom,
 }) => {
   const winRate = Math.round((user.gamesWon / user.gamesPlayed) * 100);
+  const [roomCode, setRoomCode] = useState("");
+  const [error, setError] = useState("");
+  const [isJoining, setIsJoining] = useState(false);
+
+  const handleJoinRoom = () => {
+    const trimmedRoomCode = roomCode.trim().toUpperCase();
+
+    // Clear previous error
+    setError("");
+
+    // Validate room code
+    if (!trimmedRoomCode) {
+      setError("Please enter a room code");
+      return;
+    }
+
+    if (trimmedRoomCode.length < 4) {
+      setError("Room code must be at least 4 characters");
+      return;
+    }
+
+    // Start joining process
+    setIsJoining(true);
+
+    // Check if room exists
+    socket.emit("checkRoomExists", { roomCode: trimmedRoomCode });
+  };
+
+  useEffect(() => {
+    const handleRoomExists = ({
+      roomCode: checkedRoomCode,
+      exists,
+    }: {
+      roomCode: string;
+      exists: boolean;
+    }) => {
+      if (checkedRoomCode === roomCode.trim().toUpperCase()) {
+        setIsJoining(false);
+
+        if (exists) {
+          // Room exists, navigate to it
+          onJoinRoom(checkedRoomCode);
+        } else {
+          // Room doesn't exist
+          setError("Room not found. Please check the room code and try again.");
+        }
+      }
+    };
+
+    socket.on("roomExists", handleRoomExists);
+
+    return () => {
+      socket.off("roomExists", handleRoomExists);
+    };
+  }, [roomCode, onJoinRoom]);
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleJoinRoom();
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12">
@@ -156,12 +228,32 @@ const MainContent: React.FC<MainContentProps> = ({
             <input
               type="text"
               placeholder="Enter room code..."
-              className="flex-1 px-6 py-4 border-2 border-gray-200 rounded-full focus:outline-none focus:border-[#118ab2] text-lg"
+              value={roomCode}
+              onChange={(e) => setRoomCode(e.target.value)}
+              onKeyPress={handleKeyPress}
+              className={`flex-1 px-6 py-4 border-2 rounded-full focus:outline-none text-lg transition-all duration-200 ${
+                error
+                  ? "border-red-300 focus:border-red-500"
+                  : "border-gray-200 focus:border-[#118ab2]"
+              }`}
+              disabled={isJoining}
             />
-            <button className="bg-[#118ab2] text-white px-10 py-4 rounded-full font-bold text-lg hover:bg-[#0f7a9c] transition-all duration-200 transform hover:scale-105">
-              Join Room
+            <button
+              onClick={handleJoinRoom}
+              disabled={isJoining || !roomCode.trim()}
+              className="bg-[#118ab2] text-white px-10 py-4 rounded-full font-bold text-lg hover:bg-[#0f7a9c] transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+            >
+              {isJoining ? "Joining..." : "Join Room"}
             </button>
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mt-4 flex items-center justify-center space-x-2 text-red-500">
+              <AlertCircle className="w-5 h-5" />
+              <span className="text-sm font-medium">{error}</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

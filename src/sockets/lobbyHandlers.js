@@ -1,6 +1,7 @@
 import { User } from "../models/UserSchema.js";
 
 const guestRooms = {};
+const userSocketMap = new Map(); // Map userId to socketId
 const words = [
   "Elephant",
   "Spaceship",
@@ -27,6 +28,21 @@ const words = [
 ];
 
 export const handleLobbySockets = (io, socket) => {
+  // Track user online status
+  socket.on("user_online", ({ userId }) => {
+    userSocketMap.set(userId, socket.id);
+  });
+
+  socket.on("user_offline", ({ userId }) => {
+    userSocketMap.delete(userId);
+  });
+
+  socket.on("checkRoomExists", ({ roomCode }) => {
+    const room = guestRooms[roomCode];
+    const exists = !!room;
+    io.to(socket.id).emit("roomExists", { roomCode, exists });
+  });
+
   socket.on("join_lobby", ({ roomCode, username }) => {
     socket.join(roomCode);
     socket.data.username = username;
@@ -79,6 +95,10 @@ export const handleLobbySockets = (io, socket) => {
     );
     io.to(socket.id).emit("HostAssigned", { host: room.host });
     io.to(socket.id).emit("lobbySettingsUpdated", room.settings);
+
+    console.log(
+      `[join_lobby] ${username} joined room ${roomCode}. Host: ${room.host}`,
+    );
   });
 
   socket.on("guest_lobby_chat", ({ roomCode, username, message }) => {
@@ -90,6 +110,109 @@ export const handleLobbySockets = (io, socket) => {
       message,
       timestamp,
     });
+  });
+
+  socket.on(
+    "inviteFriend",
+    ({ friendId, friendUsername, roomCode, roomName, inviterUsername }) => {
+      // Get the friend's socket ID
+      const friendSocketId = userSocketMap.get(friendId);
+
+      if (friendSocketId) {
+        // Send invitation directly to the friend
+        io.to(friendSocketId).emit("friendInvited", {
+          friendId,
+          friendUsername,
+          roomCode,
+          roomName,
+          inviterUsername,
+          timestamp: Date.now(),
+        });
+      } else {
+        // Friend is offline, could store invitation in database for later
+        console.log(
+          `Friend ${friendUsername} is offline, invitation stored for later`,
+        );
+      }
+    },
+  );
+
+  socket.on("acceptInvitation", ({ invitationId, roomCode, username }) => {
+    // Join the room
+    socket.join(roomCode);
+    socket.data.username = username;
+
+    const room = guestRooms[roomCode];
+    if (!room) return;
+
+    if (!room.players.some((p) => p.username === username)) {
+      room.players.push({ socketId: socket.id, username, score: 0 });
+    } else {
+      room.players = room.players.map((p) =>
+        p.username === username
+          ? { ...p, socketId: socket.id, score: p.score || 0 }
+          : p,
+      );
+    }
+
+    // Notify all players in the room
+    io.to(roomCode).emit(
+      "PlayerJoined",
+      room.players.map((p) => ({
+        id: p.socketId,
+        name: p.username,
+        score: p.score || 0,
+        isConnected: true,
+        isDrawing: p.isDrawing || false,
+      })),
+    );
+
+    // Send host assignment and settings to the new player
+    io.to(socket.id).emit("HostAssigned", { host: room.host });
+    io.to(socket.id).emit("lobbySettingsUpdated", room.settings);
+
+    console.log(
+      `[acceptInvitation] ${username} accepted invitation to room ${roomCode}. Host: ${room.host}`,
+    );
+  });
+
+  socket.on("declineInvitation", ({ invitationId, roomCode, username }) => {
+    // Just log the decline for now
+    console.log(`User ${username} declined invitation to room ${roomCode}`);
+  });
+
+  socket.on("leave_lobby", ({ roomCode, username }) => {
+    const room = guestRooms[roomCode];
+    if (!room) return;
+
+    // Remove player from room
+    room.players = room.players.filter((p) => p.username !== username);
+
+    // Leave the socket room
+    socket.leave(roomCode);
+
+    // If no players left, delete the room
+    if (room.players.length === 0) {
+      delete guestRooms[roomCode];
+    } else {
+      // If host left, assign new host
+      if (room.host === username) {
+        room.host = room.players[0].username;
+        io.to(roomCode).emit("HostAssigned", { host: room.host });
+      }
+
+      // Notify remaining players
+      io.to(roomCode).emit(
+        "PlayerJoined",
+        room.players.map((p) => ({
+          id: p.socketId,
+          name: p.username,
+          score: p.score || 0,
+          isConnected: true,
+          isDrawing: p.isDrawing || false,
+        })),
+      );
+    }
   });
 
   socket.on("updateSettings", ({ roomCode, settings }) => {

@@ -58,6 +58,15 @@ type ServerToClientEvents = {
     recipient?: string;
   }) => void;
   friend_status_update: (data: { userId: string; status: string }) => void;
+  friendInvited: (data: {
+    friendId: string;
+    friendUsername: string;
+    roomCode: string;
+    roomName: string;
+    inviterUsername: string;
+    timestamp: number;
+  }) => void;
+  roomExists: (data: { roomCode: string; exists: boolean }) => void;
 };
 
 type ClientToServerEvents = {
@@ -84,6 +93,26 @@ type ClientToServerEvents = {
   }) => void;
   sendDirectMessage: (data: { recipientId: string; message: any }) => void;
   sendChatMessage: (data: { roomCode: string; message: any }) => void;
+  inviteFriend: (data: {
+    friendId: string;
+    friendUsername: string;
+    roomCode: string;
+    roomName: string;
+    inviterUsername: string;
+  }) => void;
+  acceptInvitation: (data: {
+    invitationId: string;
+    roomCode: string;
+    username: string;
+  }) => void;
+  declineInvitation: (data: {
+    invitationId: string;
+    roomCode: string;
+    username: string;
+  }) => void;
+  leave_lobby: (data: { roomCode: string; username: string }) => void;
+  user_online: (data: { userId: string }) => void;
+  checkRoomExists: (data: { roomCode: string }) => void;
 };
 
 const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(

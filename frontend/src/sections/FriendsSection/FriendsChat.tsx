@@ -10,7 +10,7 @@ import {
   MessageSquare,
   ArrowLeft,
   Search,
-  UserPlus,
+  // UserPlus removed as it's not used
 } from "lucide-react";
 import { gsap } from "gsap";
 import socket from "../../sockets/socket";
@@ -23,6 +23,17 @@ interface ChatMessage {
   timestamp: Date;
   type: "message" | "system" | "direct";
   recipient?: string;
+}
+
+interface GameInvitation {
+  id: string;
+  friendId: string;
+  friendUsername: string;
+  roomCode: string;
+  roomName: string;
+  inviterUsername: string;
+  timestamp: number;
+  status: "pending" | "accepted" | "declined";
 }
 
 interface Friend {
@@ -55,13 +66,14 @@ const FriendsChat: React.FC<ChatBoxProps> = ({ roomCode, username }) => {
   const [currentView, setCurrentView] = useState<ChatView>("lobby");
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [friendSearchQuery, setFriendSearchQuery] = useState("");
+  // friendSearchQuery removed as it's not used
+  const [invitations, setInvitations] = useState<GameInvitation[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout>();
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Mock friends data - in real app, this would come from server
   useEffect(() => {
@@ -208,10 +220,59 @@ const FriendsChat: React.FC<ChatBoxProps> = ({ roomCode, username }) => {
       },
     );
 
+    // Listen for game invitations
+    (socket as any).on(
+      "friendInvited",
+      (data: {
+        friendId: string;
+        friendUsername: string;
+        roomCode: string;
+        roomName: string;
+        inviterUsername: string;
+        timestamp: number;
+      }) => {
+        // Check if this invitation is for the current user
+        const userRaw = localStorage.getItem("user");
+        if (userRaw) {
+          try {
+            const user = JSON.parse(userRaw);
+            const currentUserId = user.id || user._id;
+
+            if (data.friendId === currentUserId) {
+              const invitation: GameInvitation = {
+                id: Date.now().toString(),
+                ...data,
+                status: "pending",
+              };
+
+              setInvitations((prev) => [...prev, invitation]);
+
+              // Show notification
+              setUnreadCount((prev) => prev + 1);
+
+              // Animate button on new invitation
+              if (buttonRef.current) {
+                gsap.to(buttonRef.current, {
+                  scale: 1.1,
+                  duration: 0.2,
+                  yoyo: true,
+                  repeat: 1,
+                  ease: "power2.inOut",
+                });
+              }
+            }
+          } catch (error) {
+            console.error("Error parsing user data:", error);
+          }
+        }
+      },
+    );
+
     return () => {
       (socket as any).off("chatMessage");
       (socket as any).off("userTyping");
       (socket as any).off("friend_status_update");
+      (socket as any).off("friendInvited");
     };
   }, [roomCode, username, isOpen, isMinimized, currentView, friends]);
 
@@ -429,8 +490,48 @@ const FriendsChat: React.FC<ChatBoxProps> = ({ roomCode, username }) => {
   const getTotalUnreadCount = () => {
     return (
       unreadCount +
-      friends.reduce((total, friend) => total + friend.unreadCount, 0)
+      friends.reduce((total, friend) => total + friend.unreadCount, 0) +
+      invitations.filter((inv) => inv.status === "pending").length
     );
+  };
+
+  const handleAcceptInvitation = (invitation: GameInvitation) => {
+    // Update invitation status
+    setInvitations((prev) =>
+      prev.map((inv) =>
+        inv.id === invitation.id
+          ? { ...inv, status: "accepted" as const }
+          : inv,
+      ),
+    );
+
+    // Emit accept invitation event
+    (socket as any).emit("acceptInvitation", {
+      invitationId: invitation.id,
+      roomCode: invitation.roomCode,
+      username: username,
+    });
+
+    // Navigate to the lobby
+    window.location.href = `/friends-lobby?roomCode=${invitation.roomCode}`;
+  };
+
+  const handleDeclineInvitation = (invitation: GameInvitation) => {
+    // Update invitation status
+    setInvitations((prev) =>
+      prev.map((inv) =>
+        inv.id === invitation.id
+          ? { ...inv, status: "declined" as const }
+          : inv,
+      ),
+    );
+
+    // Emit decline invitation event
+    (socket as any).emit("declineInvitation", {
+      invitationId: invitation.id,
+      roomCode: invitation.roomCode,
+      username: username,
+    });
   };
 
   return (
@@ -680,15 +781,74 @@ const FriendsChat: React.FC<ChatBoxProps> = ({ roomCode, username }) => {
                     </div>
                   )}
 
-                  {filteredFriends.length === 0 && (
-                    <div className="text-center text-gray-500 py-8">
-                      <Users className="w-8 h-8 mx-auto mb-3 opacity-30" />
-                      <p className="text-sm font-medium text-[#073b4c] mb-1">
-                        No friends found
-                      </p>
-                      <p className="text-xs">Try adjusting your search</p>
+                  {/* Game Invitations */}
+                  {invitations.filter((inv) => inv.status === "pending")
+                    .length > 0 && (
+                    <div className="p-4 border-t border-gray-200">
+                      <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
+                        Game Invitations (
+                        {
+                          invitations.filter((inv) => inv.status === "pending")
+                            .length
+                        }
+                        )
+                      </h4>
+                      <div className="space-y-2">
+                        {invitations
+                          .filter((inv) => inv.status === "pending")
+                          .map((invitation) => (
+                            <div
+                              key={invitation.id}
+                              className="p-3 bg-gradient-to-r from-[#ffd166] to-[#ffcc4d] rounded-xl border border-yellow-200"
+                            >
+                              <div className="flex items-center space-x-3 mb-2">
+                                <div className="w-8 h-8 bg-[#ef476f] rounded-full flex items-center justify-center text-white font-bold text-sm">
+                                  🎮
+                                </div>
+                                <div>
+                                  <p className="font-medium text-[#073b4c] text-sm">
+                                    {invitation.roomName}
+                                  </p>
+                                  <p className="text-xs text-[#073b4c]/70">
+                                    Invited by {invitation.inviterUsername}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() =>
+                                    handleAcceptInvitation(invitation)
+                                  }
+                                  className="flex-1 bg-[#06d6a0] text-white py-1.5 px-3 rounded-lg text-xs font-bold hover:bg-[#05c090] transition-colors"
+                                >
+                                  Accept
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleDeclineInvitation(invitation)
+                                  }
+                                  className="flex-1 bg-gray-300 text-gray-700 py-1.5 px-3 rounded-lg text-xs font-bold hover:bg-gray-400 transition-colors"
+                                >
+                                  Decline
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
                     </div>
                   )}
+
+                  {filteredFriends.length === 0 &&
+                    invitations.filter((inv) => inv.status === "pending")
+                      .length === 0 && (
+                      <div className="text-center text-gray-500 py-8">
+                        <Users className="w-8 h-8 mx-auto mb-3 opacity-30" />
+                        <p className="text-sm font-medium text-[#073b4c] mb-1">
+                          No friends found
+                        </p>
+                        <p className="text-xs">Try adjusting your search</p>
+                      </div>
+                    )}
                 </div>
               )}
 

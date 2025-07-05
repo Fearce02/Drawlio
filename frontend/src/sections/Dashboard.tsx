@@ -10,7 +10,7 @@ const Dashboard: React.FC = () => {
   //   const [usern, setUser] = useState<any>(null);
   const [user, setUser] = useState<any>(null);
   const [editingProfile, setEditingProfile] = useState(false);
-  const [showLobby, setShowLobby] = useState(false);
+  // Removed unused state
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -73,11 +73,7 @@ const Dashboard: React.FC = () => {
     setEditingProfile(false);
   };
 
-  const handleCreateRoom = () => {
-    console.log("Create room clicked!");
-    setShowLobby(true);
-    // Navigate or trigger room creation
-  };
+  // handleCreateRoom is now passed to MainContent
 
   const handleViewFriends = () => {
     navigate("/friends");
@@ -124,25 +120,15 @@ const Dashboard: React.FC = () => {
               gamesPlayed: user.gamesPlayed,
               gamesWon: user.gamesWon,
             }}
-            onCreateRoom={() => console.log("Create room clicked")}
+            onCreateRoom={() => navigate("/friends-lobby")}
             onViewFriends={handleViewFriends}
+            onJoinRoom={(roomCode) =>
+              navigate(`/friends-lobby?roomCode=${roomCode}`)
+            }
           />
         )}
       </div>
       {/* FriendsChat floating chat for signed-in users only */}
-      <div
-        style={{
-          position: "fixed",
-          bottom: 0,
-          right: 0,
-          zIndex: 9999,
-          background: "red",
-          color: "white",
-          padding: "8px",
-        }}
-      >
-        DEBUG MARKER
-      </div>
       {!guestUsername && userId && username && (
         <FriendsChat roomCode={"dashboard"} username={username} />
       )}
