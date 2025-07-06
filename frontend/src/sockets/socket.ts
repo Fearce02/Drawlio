@@ -67,6 +67,20 @@ type ServerToClientEvents = {
     timestamp: number;
   }) => void;
   roomExists: (data: { roomCode: string; exists: boolean }) => void;
+  statsUpdated: (data: {
+    stats: {
+      gamesplayed: number;
+      gamesWon: number;
+      level: number;
+      winRate: number;
+      xp: number;
+      currentXP: number;
+      xpToNextLevel: number;
+    };
+    xpEarned?: number;
+    leveledUp?: boolean;
+    levelUpMessage?: string;
+  }) => void;
 };
 
 type ClientToServerEvents = {

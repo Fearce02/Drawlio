@@ -17,6 +17,18 @@ const userStats = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  xp: {
+    type: Number,
+    default: 0,
+  },
+  currentXP: {
+    type: Number,
+    default: 0,
+  },
+  xpToNextLevel: {
+    type: Number,
+    default: 100,
+  },
 });
 
 const userSchema = new mongoose.Schema(

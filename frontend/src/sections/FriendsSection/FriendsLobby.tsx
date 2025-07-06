@@ -51,9 +51,7 @@ const FriendsLobby: React.FC<FriendsLobbyProps> = ({ onBack }) => {
   const urlParams = new URLSearchParams(location.search);
   const urlRoomCode = urlParams.get("roomCode");
   const roomCode = useRef(
-    urlRoomCode ||
-      localStorage.getItem("roomCode") ||
-      Math.random().toString(36).substring(2, 8).toUpperCase(),
+    urlRoomCode || Math.random().toString(36).substring(2, 8).toUpperCase(),
   ).current; // Random Room code for the lobby
   const [copied, setCopied] = useState(false); // for copying the roomcode
   const [host, setHost] = useState<string | null>(null); // Assigning the lobby host
@@ -126,6 +124,36 @@ const FriendsLobby: React.FC<FriendsLobbyProps> = ({ onBack }) => {
     };
 
     fetchFriends();
+
+    // Listen for real-time friend status updates
+    const handleFriendStatusUpdate = ({
+      userId,
+      status,
+    }: {
+      userId: string;
+      status: string;
+    }) => {
+      console.log(
+        `[FriendsLobby] Received status update: ${userId} is now ${status}`,
+      );
+      setFriends((prev) =>
+        prev.map((f) =>
+          f.id === userId
+            ? {
+                ...f,
+                isOnline: status === "online",
+                lastSeen: status === "offline" ? new Date() : undefined,
+              }
+            : f,
+        ),
+      );
+    };
+
+    (socket as any).on("friend_status_update", handleFriendStatusUpdate);
+
+    return () => {
+      (socket as any).off("friend_status_update", handleFriendStatusUpdate);
+    };
   }, []);
 
   useEffect(() => {
@@ -167,6 +195,7 @@ const FriendsLobby: React.FC<FriendsLobbyProps> = ({ onBack }) => {
           players: playersRef.current,
           settings: roomSettingsRef.current,
           host: hostRef.current,
+          roomCode: roomCode,
         },
       });
     };
@@ -182,10 +211,9 @@ const FriendsLobby: React.FC<FriendsLobbyProps> = ({ onBack }) => {
       socket.off("lobbySettingsUpdated", handleLobbySettingsUpdated);
       socket.off("GameStarted", handleGameStarted);
 
-      // Leave the lobby when component unmounts
-      if (username && roomCode) {
-        socket.emit("leave_lobby", { roomCode, username });
-      }
+      // Only leave the lobby if we're not navigating to the game
+      // The game navigation will handle this differently
+      // We don't want to leave the lobby when the game is starting
     };
   }, [roomCode, navigate, username]); // Removed problematic dependencies
 
@@ -221,6 +249,14 @@ const FriendsLobby: React.FC<FriendsLobbyProps> = ({ onBack }) => {
         ease: "power2.inOut",
       });
     }
+  };
+
+  const handleBackToDashboard = () => {
+    // Leave the lobby when going back to dashboard
+    if (username && roomCode) {
+      socket.emit("leave_lobby", { roomCode, username });
+    }
+    onBack();
   };
 
   const handleSettingsChange = (
@@ -278,7 +314,7 @@ const FriendsLobby: React.FC<FriendsLobbyProps> = ({ onBack }) => {
       {/* Header */}
       <div ref={headerRef} className="flex items-center mb-8">
         <button
-          onClick={onBack}
+          onClick={handleBackToDashboard}
           className="flex items-center space-x-3 text-[#073b4c] hover:text-[#ef476f] transition-all duration-300 font-medium transform hover:scale-105"
           onMouseEnter={(e) => {
             gsap.to(e.currentTarget.querySelector("svg"), {

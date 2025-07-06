@@ -1,7 +1,15 @@
 import { User } from "../models/UserSchema.js";
+import {
+  calculateGameXPAwards,
+  updateUserStatsWithXP,
+  didUserLevelUp,
+  getLevelUpMessage,
+} from "../utils/xpSystem.js";
 
 const guestRooms = {};
 const userSocketMap = new Map(); // Map userId to socketId
+const socketToUserMap = new Map(); // Map socketId to userId for authenticated users
+const usernameToUserIdMap = new Map(); // Map username to userId for authenticated users
 const words = [
   "Elephant",
   "Spaceship",
@@ -227,31 +235,33 @@ export const handleLobbySockets = (io, socket) => {
     const room = guestRooms[roomCode];
     if (!room) return;
 
-    room.gameState.isActive = true;
-    room.gameState.currentRound = 1;
-    room.gameState.drawerIndex = 0;
+    // Initialize game state properly
+    room.gameState = {
+      isActive: true,
+      currentRound: 1,
+      drawerIndex: 0,
+      currentWord: null,
+      timer: null,
+      totalTurns: 0,
+      playersGuessedCorrectly: [],
+      roundStartTime: null,
+    };
     room.joinedPlayers = [];
     room._gameStarted = false;
-    room.gameState.totalTurns = 0;
 
-    // const drawer = room.players[room.gameState.drawerIndex];
-    // const roundDuration = room.settings.roundDuration;
+    console.log(`[startGame] Game state initialized:`, {
+      isActive: room.gameState.isActive,
+      currentRound: room.gameState.currentRound,
+      totalRounds: room.settings.totalRounds,
+      players: room.players.length,
+    });
+
     io.to(roomCode).emit("GameStarted", {
       message: "Game has started",
     });
-
-    // io.to(roomCode).emit("GameStarted", {
-    //   message: "Game Has Started",
-    //   settings: room.settings,
-    //   drawer: drawer.username,
-    //   round: 1,
-    //   time: roundDuration,
-    // });
-    // console.log("[startGame] Using settings:", room.settings);
-    // startNextTurn(io, roomCode);
   });
 
-  socket.on("joinGameRoom", ({ roomCode, username }) => {
+  socket.on("joinGameRoom", async ({ roomCode, username }) => {
     console.log(
       `[joinGameRoom] ${username} (${socket.id}) joined game room: ${roomCode}`,
     );
@@ -259,10 +269,31 @@ export const handleLobbySockets = (io, socket) => {
     socket.data.username = username;
 
     const room = guestRooms[roomCode];
-    if (!room) return;
+    if (!room) {
+      console.log(`[joinGameRoom] Room ${roomCode} not found!`);
+      return;
+    }
+
+    // Update player's socket ID if they reconnected during an active game
+    const playerIndex = room.players.findIndex((p) => p.username === username);
+    if (playerIndex !== -1) {
+      room.players[playerIndex].socketId = socket.id;
+      console.log(
+        `[joinGameRoom] Updated socket ID for ${username} to ${socket.id}`,
+      );
+    }
+
     if (!room.joinedPlayers.includes(username)) {
       room.joinedPlayers.push(username);
     }
+
+    console.log(`[joinGameRoom] Room state:`, {
+      joinedPlayers: room.joinedPlayers,
+      totalPlayers: room.players.length,
+      allJoined: room.joinedPlayers.length === room.players.length,
+      gameStarted: room._gameStarted,
+      isActive: room.gameState?.isActive,
+    });
 
     const allJoined = room.joinedPlayers.length === room.players.length;
 
@@ -270,8 +301,8 @@ export const handleLobbySockets = (io, socket) => {
       room._gameStarted = true;
       console.log(
         `[joinGameRoom] All players joined. Starting game for room: ${roomCode}`,
-        startNextTurn(io, roomCode),
       );
+      await startNextTurn(io, roomCode);
     }
   });
 
@@ -311,6 +342,21 @@ export const handleLobbySockets = (io, socket) => {
       player.score += score;
       room.gameState.playersGuessedCorrectly.push(player.username);
 
+      // Track words guessed correctly for XP
+      if (!player.wordsGuessedCorrectly) {
+        player.wordsGuessedCorrectly = 0;
+      }
+      player.wordsGuessedCorrectly++;
+
+      // Track words drawn successfully for the current drawer
+      const currentDrawer = room.players[room.gameState.drawerIndex];
+      if (currentDrawer && !currentDrawer.wordsDrawnSuccessfully) {
+        currentDrawer.wordsDrawnSuccessfully = 0;
+      }
+      if (currentDrawer) {
+        currentDrawer.wordsDrawnSuccessfully++;
+      }
+
       io.to(roomCode).emit("CorrectGuess", {
         username: player.username,
         message,
@@ -327,8 +373,8 @@ export const handleLobbySockets = (io, socket) => {
 
       if (allGuessed) {
         clearTimeout(room.gameState.timer);
-        setTimeout(() => {
-          advanceTurn(io, roomCode);
+        setTimeout(async () => {
+          await advanceTurn(io, roomCode);
         }, 2000);
       } else {
         io.to(roomCode).emit("ChatMessage", {
@@ -349,11 +395,15 @@ export const handleLobbySockets = (io, socket) => {
   socket.on("user_online", async ({ userId }) => {
     if (!userId) return;
     socket.data.userId = userId;
+    socketToUserMap.set(socket.id, userId); // Track authenticated users
     try {
       await User.findByIdAndUpdate(userId, { status: "online" });
       // Notify all friends
       const user = await User.findById(userId).populate("friends", "_id");
       if (user && user.friends) {
+        console.log(
+          `[user_online] User ${user.username} (${userId}) is online. Notifying ${user.friends.length} friends.`,
+        );
         user.friends.forEach((friend) => {
           io.to(friend._id.toString()).emit("friend_status_update", {
             userId,
@@ -363,9 +413,14 @@ export const handleLobbySockets = (io, socket) => {
       }
       // Join a personal room for this user for direct events
       socket.join(userId);
-      // Store username for message handling
-      socket.data.username = user.username;
-    } catch {}
+      // Store username for message handling and stats tracking
+      if (user) {
+        socket.data.username = user.username;
+        usernameToUserIdMap.set(user.username, userId); // Track username to userId mapping
+      }
+    } catch (error) {
+      console.error("Error in user_online handler:", error);
+    }
   });
 
   socket.on("user_offline", async ({ userId }) => {
@@ -375,6 +430,9 @@ export const handleLobbySockets = (io, socket) => {
       // Notify all friends
       const user = await User.findById(userId).populate("friends", "_id");
       if (user && user.friends) {
+        console.log(
+          `[user_offline] User ${user.username} (${userId}) is offline. Notifying ${user.friends.length} friends.`,
+        );
         user.friends.forEach((friend) => {
           io.to(friend._id.toString()).emit("friend_status_update", {
             userId,
@@ -387,12 +445,17 @@ export const handleLobbySockets = (io, socket) => {
 
   socket.on("disconnect", async () => {
     const userId = socket.data.userId;
+    const username = socket.data.username;
+
     if (userId) {
       try {
         await User.findByIdAndUpdate(userId, { status: "offline" });
         // Notify all friends
         const user = await User.findById(userId).populate("friends", "_id");
         if (user && user.friends) {
+          console.log(
+            `[disconnect] User ${user.username} (${userId}) disconnected. Notifying ${user.friends.length} friends.`,
+          );
           user.friends.forEach((friend) => {
             io.to(friend._id.toString()).emit("friend_status_update", {
               userId,
@@ -402,33 +465,48 @@ export const handleLobbySockets = (io, socket) => {
         }
       } catch {}
     }
+
+    // Clean up socket mappings
+    socketToUserMap.delete(socket.id);
+    userSocketMap.delete(userId);
+    if (username) {
+      usernameToUserIdMap.delete(username);
+    }
+
     for (const roomCode in guestRooms) {
       const room = guestRooms[roomCode];
       const index = room.players.findIndex((p) => p.socketId === socket.id);
       if (index !== -1) {
         const [disconnected] = room.players.splice(index, 1);
 
-        if (disconnected.username === room.host && room.players.length > 0) {
-          room.host = room.players[0].username;
-          io.to(roomCode).emit("HostAssigned", { host: room.host });
-        }
-
-        if (room.players.length === 0) {
-          delete guestRooms[roomCode];
-        } else {
-          const players = room.players.map((p) => ({
-            username: p.username,
-          }));
-          io.to(roomCode).emit(
-            "PlayerJoined",
-            room.players.map((p) => ({
-              id: p.socketId,
-              name: p.username,
-              score: p.score || 0,
-              isConnected: true,
-              isDrawing: p.isDrawing || false,
-            })),
+        // Don't remove players or delete room if game is active
+        if (room.gameState && room.gameState.isActive) {
+          console.log(
+            `[disconnect] Player ${disconnected.username} disconnected during active game in room ${roomCode}. Keeping room alive.`,
           );
+          // Just update the socket ID to null to indicate disconnected but keep player in room
+          room.players.push({ ...disconnected, socketId: null });
+        } else {
+          // Normal lobby disconnect logic
+          if (disconnected.username === room.host && room.players.length > 0) {
+            room.host = room.players[0].username;
+            io.to(roomCode).emit("HostAssigned", { host: room.host });
+          }
+
+          if (room.players.length === 0) {
+            delete guestRooms[roomCode];
+          } else {
+            io.to(roomCode).emit(
+              "PlayerJoined",
+              room.players.map((p) => ({
+                id: p.socketId,
+                name: p.username,
+                score: p.score || 0,
+                isConnected: true,
+                isDrawing: p.isDrawing || false,
+              })),
+            );
+          }
         }
 
         break;
@@ -522,13 +600,31 @@ export const handleLobbySockets = (io, socket) => {
   });
 };
 
-function startNextTurn(io, roomCode) {
+async function startNextTurn(io, roomCode) {
   console.log(`[startNextTurn] Starting next turn for room: ${roomCode}`);
   const room = guestRooms[roomCode];
-  const { players, gameState } = room;
-  console.log(`[startNextTurn] room: ${roomCode}`);
+  if (!room) {
+    console.log(`[startNextTurn] Room ${roomCode} not found!`);
+    return;
+  }
 
+  const { players, gameState } = room;
+  console.log(`[startNextTurn] Game state:`, {
+    isActive: gameState.isActive,
+    currentRound: gameState.currentRound,
+    totalRounds: room.settings.totalRounds,
+    players: players.length,
+    drawerIndex: gameState.drawerIndex,
+  });
+
+  // Check if game should end (currentRound exceeds totalRounds)
   if (gameState.currentRound > room.settings.totalRounds) {
+    console.log(
+      `[startNextTurn] Game over - currentRound (${gameState.currentRound}) > totalRounds (${room.settings.totalRounds})`,
+    );
+    // Update stats for authenticated users before emitting GameOver
+    await updateUserStats(players, roomCode, io);
+
     io.to(roomCode).emit("GameOver", {
       message: "Game Over!",
       players: players.map((p) => ({ username: p.username, score: p.score })),
@@ -565,8 +661,8 @@ function startNextTurn(io, roomCode) {
 
   console.log(`[startNextTurn] Emitting NewTurn to room: ${roomCode}`);
 
-  gameState.timer = setTimeout(() => {
-    advanceTurn(io, roomCode);
+  gameState.timer = setTimeout(async () => {
+    await advanceTurn(io, roomCode);
   }, room.settings.roundDuration * 1000);
 }
 
@@ -619,7 +715,7 @@ function startNextTurn(io, roomCode) {
 //   startNextTurn(io, roomCode);
 // }
 
-function advanceTurn(io, roomCode) {
+async function advanceTurn(io, roomCode) {
   const room = guestRooms[roomCode];
   if (!room) return;
 
@@ -633,6 +729,9 @@ function advanceTurn(io, roomCode) {
 
   // 🛑 Game over after all turns
   if (gamestate.totalTurns >= totalDrawerTurnsAllowed) {
+    // Update stats for authenticated users before emitting GameOver
+    await updateUserStats(room.players, roomCode, io);
+
     io.to(roomCode).emit("GameOver", {
       message: "Game Over!",
       players: room.players.map((p) => ({
@@ -657,6 +756,168 @@ function advanceTurn(io, roomCode) {
 
 function getRandomWord() {
   return words[Math.floor(Math.random() * words.length)];
+}
+
+// Function to update user stats when game ends
+async function updateUserStats(players, roomCode, io) {
+  try {
+    // Find the winner (player with highest score)
+    const sortedPlayers = players.sort((a, b) => b.score - a.score);
+    const winner = sortedPlayers[0];
+    const winnerScore = winner.score;
+
+    console.log(`[updateUserStats] Updating stats for room ${roomCode}`);
+    console.log(
+      `[updateUserStats] Players:`,
+      players.map((p) => ({ username: p.username, score: p.score })),
+    );
+    console.log(
+      `[updateUserStats] Winner: ${winner.username} with score ${winnerScore}`,
+    );
+
+    // Get room data for XP calculations
+    const room = guestRooms[roomCode];
+    const totalWordsInGame = room?.settings?.totalRounds || 3;
+
+    // Update stats for all authenticated users in the game
+    for (const player of players) {
+      // Use username to find userId instead of socket ID
+      const userId = usernameToUserIdMap.get(player.username);
+      if (userId) {
+        // This is an authenticated user, update their stats
+        const user = await User.findById(userId);
+        if (user) {
+          const isWinner =
+            player.username === winner.username && player.score === winnerScore;
+
+          // Calculate XP for this player
+          console.log(`[Stats] Player data for XP calculation:`, {
+            username: player.username,
+            wordsGuessedCorrectly: player.wordsGuessedCorrectly || 0,
+            wordsDrawnSuccessfully: player.wordsDrawnSuccessfully || 0,
+            score: player.score,
+            totalWordsInGame,
+            isWinner,
+          });
+
+          const gameData = {
+            isWinner,
+            wordsGuessedCorrectly: player.wordsGuessedCorrectly || 0,
+            wordsDrawnSuccessfully: player.wordsDrawnSuccessfully || 0,
+            isPerfectGame: player.score >= totalWordsInGame * 100, // Assuming 100 points per word
+            winStreak: user.stats?.winStreak || 0,
+            totalWordsInGame,
+          };
+
+          const xpEarned = calculateGameXPAwards(gameData);
+          console.log(`[Stats] XP calculation for ${player.username}:`, {
+            gameData,
+            xpEarned,
+          });
+          const oldLevel = user.stats?.level || 1;
+
+          // Update stats with XP system
+          const updatedStats = updateUserStatsWithXP(
+            user.stats || {},
+            xpEarned,
+          );
+
+          // Add traditional stats
+          updatedStats.gamesplayed = (user.stats?.gamesplayed || 0) + 1;
+          updatedStats.gamesWon =
+            (user.stats?.gamesWon || 0) + (isWinner ? 1 : 0);
+
+          // Calculate win rate
+          if (updatedStats.gamesplayed > 0) {
+            updatedStats.winRate = Math.round(
+              (updatedStats.gamesWon / updatedStats.gamesplayed) * 100,
+            );
+          }
+
+          // Update win streak
+          if (isWinner) {
+            updatedStats.winStreak = (user.stats?.winStreak || 0) + 1;
+          } else {
+            updatedStats.winStreak = 0;
+          }
+
+          // Create a clean stats object without Mongoose properties
+          const cleanStats = {
+            gamesplayed: updatedStats.gamesplayed,
+            gamesWon: updatedStats.gamesWon,
+            level: updatedStats.level,
+            winRate: updatedStats.winRate,
+            xp: updatedStats.xp,
+            currentXP: updatedStats.currentXP,
+            xpToNextLevel: updatedStats.xpToNextLevel,
+            winStreak: updatedStats.winStreak,
+          };
+
+          // Update user in database
+          console.log(
+            `[Stats] Saving to database for ${user.username}:`,
+            cleanStats,
+          );
+          const result = await User.findByIdAndUpdate(
+            userId,
+            {
+              stats: cleanStats,
+            },
+            { new: true },
+          );
+          console.log(
+            `[Stats] Database update result for ${user.username}:`,
+            result.stats,
+          );
+
+          // Check if user leveled up
+          const leveledUp = didUserLevelUp(oldLevel, updatedStats.level);
+          const levelUpMessage = getLevelUpMessage(
+            oldLevel,
+            updatedStats.level,
+          );
+
+          // Notify the user that their stats have been updated
+          const userSocketId = userSocketMap.get(userId);
+          if (userSocketId) {
+            console.log(
+              `[Stats] Emitting statsUpdated to user ${userId} (${user.username}) via socket ${userSocketId}`,
+            );
+            io.to(userSocketId).emit("statsUpdated", {
+              stats: updatedStats,
+              xpEarned,
+              leveledUp,
+              levelUpMessage,
+            });
+            console.log(`[Stats] statsUpdated event emitted successfully`);
+          } else {
+            console.log(
+              `[Stats] User ${userId} (${user.username}) is not connected, cannot emit statsUpdated`,
+            );
+          }
+
+          console.log(`[Stats] Updated stats for ${user.username}:`, {
+            gamesPlayed: updatedStats.gamesplayed,
+            gamesWon: updatedStats.gamesWon,
+            winRate: updatedStats.winRate,
+            level: updatedStats.level,
+            xp: updatedStats.xp,
+            currentXP: updatedStats.currentXP,
+            xpToNextLevel: updatedStats.xpToNextLevel,
+            xpEarned,
+            leveledUp,
+            isWinner,
+          });
+        }
+      } else {
+        console.log(
+          `[updateUserStats] Player ${player.username} is not an authenticated user, skipping stats update`,
+        );
+      }
+    }
+  } catch (error) {
+    console.error("Error updating user stats:", error);
+  }
 }
 
 function maskWord(word) {

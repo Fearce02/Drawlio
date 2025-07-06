@@ -16,6 +16,9 @@ interface MainContentProps {
     level: number;
     gamesPlayed: number;
     gamesWon: number;
+    xp?: number;
+    currentXP?: number;
+    xpToNextLevel?: number;
   };
   onCreateRoom: () => void;
   onViewFriends: () => void;
@@ -28,6 +31,17 @@ const MainContent: React.FC<MainContentProps> = ({
   onViewFriends,
   onJoinRoom,
 }) => {
+  // Add debugging to see when user props change
+  useEffect(() => {
+    console.log("[MainContent] User props updated:", user);
+    console.log("[MainContent] XP data:", {
+      xp: user.xp,
+      currentXP: user.currentXP,
+      xpToNextLevel: user.xpToNextLevel,
+      level: user.level,
+    });
+  }, [user]);
+
   const winRate = Math.round((user.gamesWon / user.gamesPlayed) * 100);
   const [roomCode, setRoomCode] = useState("");
   const [error, setError] = useState("");
@@ -108,7 +122,7 @@ const MainContent: React.FC<MainContentProps> = ({
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-16">
         <div className="bg-white rounded-3xl p-8 shadow-lg hover:shadow-xl transition-shadow duration-300">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-2">
                 Level
@@ -119,6 +133,32 @@ const MainContent: React.FC<MainContentProps> = ({
               <Star className="w-8 h-8 text-white" />
             </div>
           </div>
+          {user.xp !== undefined &&
+            user.currentXP !== undefined &&
+            user.xpToNextLevel !== undefined && (
+              <div className="mt-4">
+                <div className="flex justify-between text-sm text-gray-600 mb-1">
+                  <span>Total XP: {user.xp}</span>
+                  <span>{user.xpToNextLevel} XP to next level</span>
+                </div>
+                <div className="text-xs text-gray-500 mb-2">
+                  Current XP: {user.currentXP} | Progress:{" "}
+                  {Math.round(
+                    (user.currentXP / (user.currentXP + user.xpToNextLevel)) *
+                      100,
+                  )}
+                  %
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-[#ef476f] h-2 rounded-full transition-all duration-300"
+                    style={{
+                      width: `${Math.min(100, (user.currentXP / (user.currentXP + user.xpToNextLevel)) * 100)}%`,
+                    }}
+                  ></div>
+                </div>
+              </div>
+            )}
         </div>
 
         <div className="bg-white rounded-3xl p-8 shadow-lg hover:shadow-xl transition-shadow duration-300">

@@ -12,6 +12,7 @@ interface DrawingCanvasProps {
   currentTool: "pencil" | "eraser";
   currentColor: string;
   brushSize: number;
+  roomCode: string;
 }
 
 export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
@@ -19,6 +20,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   currentTool,
   currentColor,
   brushSize,
+  roomCode,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -26,7 +28,6 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
 
   const [isDrawing, setIsDrawing] = useState(false);
   const [lastPoint, setLastPoint] = useState<Point | null>(null);
-  const roomCode = localStorage.getItem("roomCode") || "";
 
   // Setup canvas
   const initializeCanvas = () => {
@@ -171,7 +172,6 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       color: string;
       brushSize: number;
     }) => {
-      if (isCurrentPlayerDrawing) return;
       drawLine(from, to, color, brushSize, false);
     };
 
@@ -179,7 +179,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     return () => {
       socket.off("drawing", handleRemoteDraw);
     };
-  }, [isCurrentPlayerDrawing]);
+  }, []);
 
   return (
     <div

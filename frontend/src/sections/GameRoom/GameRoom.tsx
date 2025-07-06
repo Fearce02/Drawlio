@@ -18,8 +18,8 @@ import { GameOver } from "./GameOver";
 
 export const GameRoom: React.FC = () => {
   const location = useLocation();
-  const { players: iniTialUsernames, settings, host } = location.state;
-  const [players, setPlayers] = useState<Player[]>(iniTialUsernames);
+  const { players: initialPlayers, settings, host } = location.state || {};
+  const [players, setPlayers] = useState<Player[]>(initialPlayers || []);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [gameState, setGameState] = useState<GameState>({
     isActive: false,
@@ -38,8 +38,44 @@ export const GameRoom: React.FC = () => {
   const gameRoomRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
-  const currentPlayerName = localStorage.getItem("guestUsername") || "Guest";
-  const roomCode = localStorage.getItem("roomCode") || "";
+  // Get user info - handle both guest and authenticated users
+  const getCurrentUserInfo = () => {
+    const guestUsername = localStorage.getItem("guestUsername");
+    if (guestUsername) {
+      // Guest user
+      return {
+        username: guestUsername,
+        isGuest: true,
+        roomCode: localStorage.getItem("roomCode") || "",
+      };
+    } else {
+      // Authenticated user
+      const userRaw = localStorage.getItem("user");
+      if (userRaw) {
+        try {
+          const user = JSON.parse(userRaw);
+          return {
+            username:
+              user.username ||
+              user.email ||
+              `${user.firstName} ${user.lastName}`,
+            isGuest: false,
+            roomCode: location.state?.roomCode || "",
+          };
+        } catch (error) {
+          console.error("Error parsing user data:", error);
+        }
+      }
+    }
+    return { username: "Unknown", isGuest: true, roomCode: "" };
+  };
+
+  const {
+    username: currentPlayerName,
+    isGuest,
+    roomCode,
+  } = getCurrentUserInfo();
+
   const isCurrentPlayerDrawing = useMemo(() => {
     return gameState.currentDrawer === currentPlayerName;
   }, [gameState.currentDrawer, currentPlayerName]);
@@ -58,8 +94,10 @@ export const GameRoom: React.FC = () => {
       currentDrawer: gameState.currentDrawer,
       gamePhase: gameState.gamePhase,
       isCurrentPlayerDrawing,
+      currentPlayerName,
+      isGuest,
     });
-  }, [gameState, isCurrentPlayerDrawing]);
+  }, [gameState, isCurrentPlayerDrawing, currentPlayerName, isGuest]);
 
   useEffect(() => {
     if (gameRoomRef.current) {
@@ -93,12 +131,13 @@ export const GameRoom: React.FC = () => {
     console.log("[GameRoom] Component mounted, attempting to join game room");
     console.log("[GameRoom] Room code:", roomCode);
     console.log("[GameRoom] Current player:", currentPlayerName);
+    console.log("[GameRoom] Is guest:", isGuest);
 
     if (roomCode) {
       console.log("[GameRoom] Emitting joinGameRoom event");
       socket.emit("joinGameRoom", { roomCode, username: currentPlayerName });
     }
-  }, [roomCode, currentPlayerName]);
+  }, [roomCode, currentPlayerName, isGuest]);
 
   // Initialize canvas when component mounts
   // useEffect(() => {
@@ -172,17 +211,12 @@ export const GameRoom: React.FC = () => {
   );
 
   useEffect(() => {
-    socket.on("GameState", (data) => {
-      console.log("[GameState] received:", data);
+    socket.on("GameStarted", (data) => {
+      console.log("[GameStarted] received:", data);
       setGameState((prev) => ({
         ...prev,
-        isActive: data.isActive,
-        currentRound: data.currentRound,
-        maxRounds: data.maxRounds,
-        timeLeft: data.timeLeft,
-        currentWord: data.currentWord || undefined,
-        currentDrawer: data.currentDrawer || undefined,
-        gamePhase: data.gamePhase as "waiting" | "drawing",
+        isActive: true,
+        gamePhase: "waiting",
       }));
     });
 
@@ -221,6 +255,18 @@ export const GameRoom: React.FC = () => {
           isSystemMessage: true,
         },
       ]);
+    });
+
+    socket.on("drawing", (data) => {
+      console.log("[drawing] received:", data);
+      // The DrawingCanvas component handles the drawing events
+      // This is just for debugging
+    });
+
+    socket.on("clearCanvas", () => {
+      console.log("[clearCanvas] received");
+      // The DrawingCanvas component handles the clear events
+      // This is just for debugging
     });
 
     socket.on("WordToDraw", (word: string) => {
@@ -284,24 +330,28 @@ export const GameRoom: React.FC = () => {
     socket.on("playAgainVote", (data: { votes: number; total: number }) => {
       const { votes, total } = data;
       setPlayAgainVotes(votes);
-      // If all players voted, navigate to lobby
+      // If all players voted, navigate to appropriate lobby
       if (votes === players.length) {
-        navigate("/guest-lobby");
+        if (isGuest) {
+          navigate("/guest-lobby");
+        } else {
+          navigate("/friends-lobby");
+        }
       }
     });
 
     return () => {
       socket.off("GameStarted");
-      socket.off("GameState");
       socket.off("NewTurn");
       socket.off("drawing");
+      socket.off("clearCanvas");
       socket.off("WordToDraw");
       socket.off("CorrectGuess");
       socket.off("ChatMessage");
       socket.off("GameOver");
       socket.off("playAgainVote");
     };
-  }, [players.length, navigate, currentPlayerName]);
+  }, [players.length, navigate, currentPlayerName, isGuest]);
 
   const handlePlayAgain = () => {
     socket.emit("playAgain", { roomCode });
@@ -309,7 +359,11 @@ export const GameRoom: React.FC = () => {
   };
 
   const handleExit = () => {
-    navigate("/");
+    if (isGuest) {
+      navigate("/");
+    } else {
+      navigate("/dashboard");
+    }
   };
 
   if (gameState.gamePhase === "finished") {
@@ -360,6 +414,7 @@ export const GameRoom: React.FC = () => {
               currentTool={currentTool}
               currentColor={currentColor}
               brushSize={brushSize}
+              roomCode={roomCode}
               // onDrawingChange={handleDrawingChange}
             />
 
