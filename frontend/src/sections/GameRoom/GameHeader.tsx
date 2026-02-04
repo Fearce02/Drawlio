@@ -72,20 +72,20 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
   return (
     <div
       ref={headerRef}
-      className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4 overflow-hidden"
+      className="bg-[#F3EDF7] rounded-[24px] shadow-sm border border-[#E7E0EC] p-4 mb-4 overflow-hidden relative"
     >
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between relative z-10">
         <div className="flex items-center space-x-6">
-          <div ref={roundRef} className="flex items-center space-x-2">
-            <Trophy className="w-5 h-5 text-yellow-500" />
-            <span className="font-semibold text-gray-700">
+          <div ref={roundRef} className="flex items-center space-x-2 bg-[#EADDFF] px-3 py-1.5 rounded-full">
+            <Trophy className="w-5 h-5 text-[#6750A4]" />
+            <span className="font-bold text-[#21005D] text-sm">
               Round {gameState.currentRound}/{gameState.maxRounds}
             </span>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <Users className="w-5 h-5 text-blue-500" />
-            <span className="text-gray-600">{playerCount} players</span>
+          <div className="flex items-center space-x-2 text-[#49454F]">
+            <Users className="w-5 h-5" />
+            <span className="text-sm font-medium">{playerCount} players</span>
           </div>
         </div>
 
@@ -95,20 +95,20 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
             gameState.gamePhase === "drawing" && (
               <div
                 ref={wordRef}
-                className="bg-gradient-to-r from-blue-50 to-purple-50 px-4 py-2 rounded-lg border border-blue-200"
+                className="bg-[#6750A4] text-white px-6 py-2 rounded-full shadow-md"
               >
-                <span className="text-blue-700 font-medium">
+                <span className="font-bold tracking-wide">
                   Word: {gameState.currentWord}
                 </span>
               </div>
             )}
 
-          <div className="flex items-center space-x-2">
-            <Clock className="w-5 h-5 text-red-500" />
+          <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-full shadow-sm border border-[#E7E0EC]">
+            <Clock className={`w-5 h-5 ${gameState.timeLeft <= 10 ? "text-[#B3261E]" : "text-[#6750A4]"}`} />
             <span
               ref={timerRef}
               className={`font-bold text-lg transition-colors duration-300 ${
-                gameState.timeLeft <= 10 ? "text-red-500" : "text-gray-700"
+                gameState.timeLeft <= 10 ? "text-[#B3261E]" : "text-[#1C1B1F]"
               }`}
             >
               {formatTime(gameState.timeLeft)}

@@ -9,14 +9,54 @@ import {
   X,
   Crown,
   Mail,
+  Play
 } from "lucide-react";
 import { gsap } from "gsap";
-// GSAP animations removed for now
 import socket from "../../sockets/socket";
 import { useNavigate, useLocation } from "react-router-dom";
 import type { Player } from "../../types/game";
 import FriendsChat from "./FriendsChat";
 import { getFriendsList } from "../../utils/friendsApi";
+
+// Reuse SelectField from Lobby.tsx or define similar
+interface SelectFieldProps {
+  label: string;
+  value: string | number;
+  options: { value: string | number; label: string }[];
+  onChange: (value: any) => void;
+  disabled?: boolean;
+}
+
+const SelectField: React.FC<SelectFieldProps> = ({ label, value, options, onChange, disabled }) => (
+  <div className="group">
+    <label className="block text-xs font-bold text-[#6750A4] mb-1 pl-1 uppercase tracking-wider">{label}</label>
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className={`
+          w-full appearance-none bg-[#F3EDF7] border-0 rounded-full px-6 py-4 pr-10
+          font-medium text-[#1C1B1F] outline-none 
+          transition-all duration-200
+          ${disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer hover:bg-[#EADDFF] focus:ring-2 focus:ring-[#6750A4]"}
+        `}
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#49454F]">
+        <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M1 1.5L6 6.5L11 1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+);
+
 
 interface Friend {
   id: string;
@@ -30,8 +70,6 @@ interface FriendsLobbyProps {
   onBack: () => void;
 }
 
-// LobbySettings interface removed as it's not used
-
 const FriendsLobby: React.FC<FriendsLobbyProps> = ({ onBack }) => {
   const [roomSettings, setRoomSettings] = useState({
     name: "",
@@ -43,37 +81,31 @@ const FriendsLobby: React.FC<FriendsLobbyProps> = ({ onBack }) => {
   });
   const navigate = useNavigate();
   const location = useLocation();
-  const [players, setPlayers] = useState<Player[]>([]); // players in lobby
-  const [friends, setFriends] = useState<Friend[]>([]); // user's friends list
-  const [invitedFriends, setInvitedFriends] = useState<string[]>([]); // friends invited to this room
+  const [players, setPlayers] = useState<Player[]>([]); 
+  const [friends, setFriends] = useState<Friend[]>([]); 
+  const [invitedFriends, setInvitedFriends] = useState<string[]>([]); 
 
-  // Get room code from URL params or generate new one
   const urlParams = new URLSearchParams(location.search);
   const urlRoomCode = urlParams.get("roomCode");
   const roomCode = useRef(
     urlRoomCode || Math.random().toString(36).substring(2, 8).toUpperCase(),
-  ).current; // Random Room code for the lobby
-  const [copied, setCopied] = useState(false); // for copying the roomcode
-  const [host, setHost] = useState<string | null>(null); // Assigning the lobby host
+  ).current; 
+  const [copied, setCopied] = useState(false); 
+  const [host, setHost] = useState<string | null>(null); 
   const [showInviteModal, setShowInviteModal] = useState(false);
 
-  const headerRef = useRef<HTMLDivElement>(null);
-  const settingsRef = useRef<HTMLDivElement>(null);
-  const friendsRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const createButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Refs to access current state in event handlers
   const playersRef = useRef<Player[]>([]);
   const roomSettingsRef = useRef(roomSettings);
   const hostRef = useRef<string | null>(null);
 
-  // Get current user info
   const userRaw = localStorage.getItem("user");
   const [username, setUsername] = useState<string>("");
 
   const isHost = username === host;
 
-  // Update refs when state changes
   useEffect(() => {
     playersRef.current = players;
   }, [players]);
@@ -87,7 +119,6 @@ const FriendsLobby: React.FC<FriendsLobbyProps> = ({ onBack }) => {
   }, [host]);
 
   useEffect(() => {
-    // Get current user info
     if (userRaw) {
       try {
         const user = JSON.parse(userRaw);
@@ -101,7 +132,6 @@ const FriendsLobby: React.FC<FriendsLobbyProps> = ({ onBack }) => {
   }, [userRaw]);
 
   useEffect(() => {
-    // Fetch friends list
     const fetchFriends = async () => {
       try {
         const token = localStorage.getItem("token");
@@ -125,7 +155,6 @@ const FriendsLobby: React.FC<FriendsLobbyProps> = ({ onBack }) => {
 
     fetchFriends();
 
-    // Listen for real-time friend status updates
     const handleFriendStatusUpdate = ({
       userId,
       status,
@@ -133,9 +162,6 @@ const FriendsLobby: React.FC<FriendsLobbyProps> = ({ onBack }) => {
       userId: string;
       status: string;
     }) => {
-      console.log(
-        `[FriendsLobby] Received status update: ${userId} is now ${status}`,
-      );
       setFriends((prev) =>
         prev.map((f) =>
           f.id === userId
@@ -210,49 +236,41 @@ const FriendsLobby: React.FC<FriendsLobbyProps> = ({ onBack }) => {
       socket.off("HostAssigned", handleHostAssigned);
       socket.off("lobbySettingsUpdated", handleLobbySettingsUpdated);
       socket.off("GameStarted", handleGameStarted);
-
-      // Only leave the lobby if we're not navigating to the game
-      // The game navigation will handle this differently
-      // We don't want to leave the lobby when the game is starting
     };
-  }, [roomCode, navigate, username]); // Removed problematic dependencies
+  }, [roomCode, navigate, username]);
+
+  useEffect(() => {
+      const ctx = gsap.context(() => {
+            gsap.fromTo(".animate-card", 
+                { opacity: 0, y: 30 },
+                { opacity: 1, y: 0, duration: 0.8, stagger: 0.1, ease: "power3.out" }
+            );
+
+            gsap.to(".bg-orb", {
+                y: -20,
+                x: 10,
+                rotation: 360,
+                duration: 20,
+                repeat: -1,
+                yoyo: true,
+                ease: "sine.inOut",
+                stagger: 2,
+            });
+      }, containerRef);
+      return () => ctx.revert();
+  }, [])
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(roomCode);
     setCopied(true);
-
-    // Copy animation
-    const copyButton = event?.currentTarget;
-    if (copyButton) {
-      gsap.to(copyButton, {
-        scale: 1.1,
-        duration: 0.2,
-        yoyo: true,
-        repeat: 1,
-        ease: "power2.inOut",
-      });
-    }
-
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleStartGame = () => {
     socket.emit("startGame", { roomCode });
-
-    // Success animation
-    if (createButtonRef.current) {
-      gsap.to(createButtonRef.current, {
-        scale: 0.9,
-        duration: 0.1,
-        yoyo: true,
-        repeat: 1,
-        ease: "power2.inOut",
-      });
-    }
   };
 
   const handleBackToDashboard = () => {
-    // Leave the lobby when going back to dashboard
     if (username && roomCode) {
       socket.emit("leave_lobby", { roomCode, username });
     }
@@ -268,7 +286,6 @@ const FriendsLobby: React.FC<FriendsLobbyProps> = ({ onBack }) => {
     setRoomSettings(updated);
 
     if (isHost) {
-      // Map frontend settings to backend format
       const backendSettings = {
         maxPlayers: updated.maxPlayers,
         totalRounds: updated.rounds,
@@ -281,10 +298,7 @@ const FriendsLobby: React.FC<FriendsLobbyProps> = ({ onBack }) => {
   };
 
   const handleInviteFriend = (friendId: string, friendUsername: string) => {
-    // Add to invited friends list
     setInvitedFriends((prev) => [...prev, friendId]);
-
-    // Emit invite event (you'll need to add this to your backend)
     socket.emit("inviteFriend", {
       friendId,
       friendUsername,
@@ -292,8 +306,6 @@ const FriendsLobby: React.FC<FriendsLobbyProps> = ({ onBack }) => {
       roomName: roomSettings.name || `Room ${roomCode}`,
       inviterUsername: username,
     });
-
-    // Close modal if all friends are invited
     setShowInviteModal(false);
   };
 
@@ -310,388 +322,278 @@ const FriendsLobby: React.FC<FriendsLobbyProps> = ({ onBack }) => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8">
-      {/* Header */}
-      <div ref={headerRef} className="flex items-center mb-8">
-        <button
-          onClick={handleBackToDashboard}
-          className="flex items-center space-x-3 text-[#073b4c] hover:text-[#ef476f] transition-all duration-300 font-medium transform hover:scale-105"
-          onMouseEnter={(e) => {
-            gsap.to(e.currentTarget.querySelector("svg"), {
-              x: -5,
-              duration: 0.3,
-            });
-          }}
-          onMouseLeave={(e) => {
-            gsap.to(e.currentTarget.querySelector("svg"), {
-              x: 0,
-              duration: 0.3,
-            });
-          }}
-        >
-          <ArrowLeft className="w-6 h-6" />
-          <span className="text-lg">Back to Dashboard</span>
-        </button>
+    <div ref={containerRef} className="min-h-screen bg-[#FDF8FC] relative overflow-hidden py-8 px-4 font-sans text-[#1C1B1F]">
+      {/* Background Orbs */}
+       <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            <div className="bg-orb absolute top-[-10%] left-[-10%] w-[60vw] h-[60vw] rounded-full bg-[#D0BCFF] opacity-20 blur-[100px]" />
+            <div className="bg-orb absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] rounded-full bg-[#EFB8C8] opacity-20 blur-[80px]" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Room Settings */}
-        <div className="lg:col-span-2 space-y-8">
-          <div ref={settingsRef} className="bg-white rounded-3xl p-8 shadow-lg">
-            <div className="flex items-center space-x-4 mb-8">
-              <div className="w-14 h-14 bg-[#118ab2] rounded-full flex items-center justify-center">
-                <Settings className="w-7 h-7 text-white" />
-              </div>
-              <h2 className="text-2xl font-bold text-[#073b4c]">
-                Room Settings
-              </h2>
-            </div>
+      <div className="max-w-7xl mx-auto relative z-10">
+        {/* Header */}
+        <div className="flex items-center mb-8 animate-card">
+          <button
+            onClick={handleBackToDashboard}
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#EADDFF] text-[#21005D] hover:bg-[#D0BCFF] transition-colors font-medium"
+          >
+            <ArrowLeft size={18} />
+            <span>Dashboard</span>
+          </button>
+        </div>
 
-            <div className="space-y-8">
-              {/* Room Name */}
-              <div className="form-group">
-                <label className="block text-sm font-bold text-[#073b4c] mb-3 uppercase tracking-wide">
-                  Room Name
-                </label>
-                <input
-                  type="text"
-                  value={roomSettings.name}
-                  disabled={!isHost}
-                  onChange={(e) => handleSettingsChange("name", e.target.value)}
-                  placeholder="Drawlio-Room-1"
-                  className="w-full px-6 py-4 border-2 border-gray-200 rounded-full focus:outline-none focus:border-[#118ab2] text-lg transition-all duration-300 focus:scale-105"
-                  onFocus={(e) => {
-                    gsap.to(e.currentTarget, { scale: 1.02, duration: 0.3 });
-                  }}
-                  onBlur={(e) => {
-                    gsap.to(e.currentTarget, { scale: 1, duration: 0.3 });
-                  }}
-                />
-              </div>
-
-              {/* Room Code */}
-              <div className="form-group">
-                <label className="block text-sm font-bold text-[#073b4c] mb-3 uppercase tracking-wide">
-                  Room Code
-                </label>
-                <div className="flex items-center space-x-4">
-                  <input
-                    disabled={!isHost}
-                    type="text"
-                    value={roomCode}
-                    readOnly
-                    className="flex-1 px-6 py-4 bg-gray-100 border-2 border-gray-200 rounded-full font-mono text-xl font-bold text-[#ef476f]"
-                  />
-                  <button
-                    onClick={handleCopyCode}
-                    className="px-6 py-4 bg-[#ffd166] text-[#073b4c] rounded-full hover:bg-[#ffcc4d] transition-all duration-300 flex items-center space-x-2 font-bold transform hover:scale-105"
-                  >
-                    {copied ? (
-                      <Check className="w-5 h-5" />
-                    ) : (
-                      <Copy className="w-5 h-5" />
-                    )}
-                    <span>{copied ? "Copied!" : "Copy"}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Settings Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="form-group">
-                  <label className="block text-sm font-bold text-[#073b4c] mb-3 uppercase tracking-wide">
-                    Max Players
-                  </label>
-                  <select
-                    disabled={!isHost}
-                    value={roomSettings.maxPlayers}
-                    onChange={(e) =>
-                      handleSettingsChange(
-                        "maxPlayers",
-                        parseInt(e.target.value),
-                      )
-                    }
-                    className="w-full px-6 py-4 border-2 border-gray-200 rounded-full focus:outline-none focus:border-[#118ab2] text-lg transition-all duration-300 focus:scale-105"
-                  >
-                    {[2, 4, 6, 8, 10, 12].map((num) => (
-                      <option key={num} value={num}>
-                        {num} players
-                      </option>
-                    ))}
-                  </select>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Room Settings */}
+          <div className="lg:col-span-2 space-y-6">
+            <div className="bg-white/80 backdrop-blur-md rounded-[32px] p-8 border border-[#CAC4D0] shadow-sm animate-card">
+                <div className="flex items-center justify-between mb-8">
+                     <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-[#EADDFF] flex items-center justify-center text-[#21005D]">
+                            <Settings size={24} />
+                        </div>
+                        <div>
+                            <h2 className="text-2xl font-bold text-[#1C1B1F]">Room Settings</h2>
+                             <p className="text-[#49454F] text-sm">Configure your private game</p>
+                        </div>
+                     </div>
                 </div>
 
-                <div className="form-group">
-                  <label className="block text-sm font-bold text-[#073b4c] mb-3 uppercase tracking-wide">
-                    Rounds
-                  </label>
-                  <select
-                    disabled={!isHost}
-                    value={roomSettings.rounds}
-                    onChange={(e) =>
-                      handleSettingsChange("rounds", parseInt(e.target.value))
-                    }
-                    className="w-full px-6 py-4 border-2 border-gray-200 rounded-full focus:outline-none focus:border-[#118ab2] text-lg transition-all duration-300 focus:scale-105"
-                  >
-                    {[1, 2, 3, 4, 5].map((num) => (
-                      <option key={num} value={num}>
-                        {num} round{num > 1 ? "s" : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label className="block text-sm font-bold text-[#073b4c] mb-3 uppercase tracking-wide">
-                    Draw Time
-                  </label>
-                  <select
-                    disabled={!isHost}
-                    value={roomSettings.drawTime}
-                    onChange={(e) =>
-                      handleSettingsChange("drawTime", parseInt(e.target.value))
-                    }
-                    className="w-full px-6 py-4 border-2 border-gray-200 rounded-full focus:outline-none focus:border-[#118ab2] text-lg transition-all duration-300 focus:scale-105"
-                  >
-                    {[30, 60, 80, 100, 120].map((seconds) => (
-                      <option key={seconds} value={seconds}>
-                        {seconds} seconds
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label className="block text-sm font-bold text-[#073b4c] mb-3 uppercase tracking-wide">
-                    Private Room
-                  </label>
-                  <div className="flex items-center space-x-4">
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={roomSettings.isPrivate}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                 {/* Room Name */}
+                 <div className="group md:col-span-2">
+                    <label className="block text-xs font-bold text-[#6750A4] mb-1 pl-1 uppercase tracking-wider">Room Name</label>
+                    <input
+                        type="text"
+                        value={roomSettings.name}
                         disabled={!isHost}
-                        onChange={(e) =>
-                          handleSettingsChange("isPrivate", e.target.checked)
-                        }
-                        className="w-5 h-5 text-[#118ab2] rounded focus:ring-[#118ab2]"
-                      />
-                      <span className="text-lg">Private</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
+                        onChange={(e) => handleSettingsChange("name", e.target.value)}
+                        placeholder="e.g. Friday Night Chaos"
+                        className="w-full bg-[#F3EDF7] border-0 rounded-full px-6 py-4 font-medium text-[#1C1B1F] placeholder:text-[#49454F]/50 outline-none focus:ring-2 focus:ring-[#6750A4] transition-all"
+                    />
+                 </div>
 
-              {/* Password field for private rooms */}
-              {roomSettings.isPrivate && (
-                <div className="form-group">
-                  <label className="block text-sm font-bold text-[#073b4c] mb-3 uppercase tracking-wide">
-                    Room Password
-                  </label>
-                  <input
-                    type="password"
-                    value={roomSettings.password}
+                 {/* Room Code */}
+                 <div className="group md:col-span-2">
+                     <label className="block text-xs font-bold text-[#6750A4] mb-1 pl-1 uppercase tracking-wider">Room Code</label>
+                     <div className="relative">
+                        <input
+                            disabled={!isHost}
+                            type="text"
+                            value={roomCode}
+                            readOnly
+                            className="w-full bg-[#F3EDF7] border-0 rounded-full px-6 py-4 font-mono font-bold text-[#1C1B1F] outline-none"
+                        />
+                        <button
+                            onClick={handleCopyCode}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-[#EADDFF] hover:bg-[#D0BCFF] text-[#21005D] px-4 py-2 rounded-full text-sm font-bold transition-colors flex items-center gap-2"
+                        >
+                            {copied ? <Check size={16}/> : <Copy size={16}/>}
+                            <span>{copied ? "Copied" : "Copy"}</span>
+                        </button>
+                     </div>
+                 </div>
+
+                 <SelectField 
+                    label="Max Players" 
+                    value={roomSettings.maxPlayers}
                     disabled={!isHost}
-                    onChange={(e) =>
-                      handleSettingsChange("password", e.target.value)
-                    }
-                    placeholder="Enter room password"
-                    className="w-full px-6 py-4 border-2 border-gray-200 rounded-full focus:outline-none focus:border-[#118ab2] text-lg transition-all duration-300 focus:scale-105"
-                  />
-                </div>
-              )}
-            </div>
-          </div>
+                    options={[2,4,6,8,10,12].map(n => ({ value: n, label: `${n} Players` }))}
+                    onChange={(v) => handleSettingsChange("maxPlayers", parseInt(v))}
+                 />
 
-          {/* Friends Invitation Section */}
-          <div className="bg-white rounded-3xl p-8 shadow-lg">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center space-x-4">
-                <div className="w-14 h-14 bg-[#06d6a0] rounded-full flex items-center justify-center">
-                  <UserPlus className="w-7 h-7 text-white" />
-                </div>
-                <h2 className="text-2xl font-bold text-[#073b4c]">
-                  Invite Friends
-                </h2>
+                <SelectField 
+                    label="Rounds" 
+                    value={roomSettings.rounds}
+                    disabled={!isHost}
+                    options={[1,2,3,4,5].map(n => ({ value: n, label: `${n} Round${n>1?'s':''}` }))}
+                    onChange={(v) => handleSettingsChange("rounds", parseInt(v))}
+                 />
+
+                 <SelectField 
+                    label="Draw Time" 
+                    value={roomSettings.drawTime}
+                    disabled={!isHost}
+                    options={[30,60,80,100,120].map(n => ({ value: n, label: `${n} Seconds` }))}
+                    onChange={(v) => handleSettingsChange("drawTime", parseInt(v))}
+                 />
+
+                 <div className="flex items-end pb-4">
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                        <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${roomSettings.isPrivate ? "bg-[#6750A4] border-[#6750A4]" : "border-[#49454F]"}`}>
+                            {roomSettings.isPrivate && <Check size={14} className="text-white" />}
+                        </div>
+                        <input 
+                            type="checkbox" 
+                            className="hidden" 
+                            checked={roomSettings.isPrivate}
+                            disabled={!isHost}
+                            onChange={(e) => handleSettingsChange("isPrivate", e.target.checked)}
+                        />
+                        <span className="text-[#1C1B1F] font-medium">Private Room</span>
+                    </label>
+                 </div>
+
+                 {roomSettings.isPrivate && (
+                    <div className="group md:col-span-2">
+                        <label className="block text-xs font-bold text-[#6750A4] mb-1 pl-1 uppercase tracking-wider">Password</label>
+                        <input
+                            type="text"
+                            value={roomSettings.password}
+                            disabled={!isHost}
+                            onChange={(e) => handleSettingsChange("password", e.target.value)}
+                            placeholder="Set a password"
+                            className="w-full bg-[#F3EDF7] border-0 rounded-full px-6 py-4 font-medium text-[#1C1B1F] outline-none focus:ring-2 focus:ring-[#6750A4] transition-all"
+                        />
+                    </div>
+                 )}
               </div>
-              <button
-                onClick={() => setShowInviteModal(true)}
-                className="bg-[#06d6a0] text-white px-6 py-3 rounded-full font-bold hover:bg-[#05c090] transition-all duration-300 flex items-center space-x-2 transform hover:scale-105"
-              >
-                <Mail className="w-5 h-5" />
-                <span>Invite Friends</span>
-              </button>
             </div>
 
             {/* Invited Friends List */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-bold text-[#073b4c] mb-4">
-                Invited Friends ({getInvitedFriends().length})
-              </h3>
-              {getInvitedFriends().length === 0 ? (
-                <p className="text-gray-500 text-center py-8 text-lg">
-                  No friends invited yet. Click "Invite Friends" to get started!
-                </p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {getInvitedFriends().map((friend) => (
-                    <div
-                      key={friend.id}
-                      className="flex items-center justify-between p-4 rounded-2xl bg-green-50 border border-green-200"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-[#06d6a0] rounded-full flex items-center justify-center text-white font-bold">
-                          {friend.avatar ||
-                            friend.username.charAt(0).toUpperCase()}
+            <div className="bg-white/80 backdrop-blur-md rounded-[32px] p-8 border border-[#CAC4D0] shadow-sm animate-card">
+                 <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-[#E8DEF8] flex items-center justify-center text-[#1D192B]">
+                            <Mail size={24} />
                         </div>
-                        <div>
-                          <p className="font-bold text-[#073b4c]">
-                            {friend.username}
-                          </p>
-                          <p className="text-sm text-green-600">
-                            {friend.isOnline ? "Online" : "Offline"}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleRemoveInvitedFriend(friend.id)}
-                        className="text-red-500 hover:text-red-700 transition-colors"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
+                        <h2 className="text-xl font-bold text-[#1C1B1F]">Invitations</h2>
+                     </div>
+                     <button
+                        onClick={() => setShowInviteModal(true)}
+                        className="bg-[#6750A4] text-white px-6 py-3 rounded-full font-bold text-sm hover:bg-[#523E8E] transition-colors flex items-center gap-2"
+                     >
+                        <UserPlus size={18} />
+                        <span>Invite Friends</span>
+                     </button>
+                 </div>
+
+                 {getInvitedFriends().length === 0 ? (
+                    <div className="text-center py-8 text-[#49454F]">
+                        <p>No invitations sent yet.</p>
                     </div>
-                  ))}
-                </div>
-              )}
+                 ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {getInvitedFriends().map(friend => (
+                            <div key={friend.id} className="bg-[#F3EDF7] p-3 rounded-2xl flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-[#6750A4] text-white flex items-center justify-center font-bold text-sm">
+                                        {friend.avatar || friend.username.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-[#1C1B1F] text-sm">{friend.username}</p>
+                                        <p className="text-xs text-[#49454F]">{friend.isOnline ? "Online" : "Offline"}</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => handleRemoveInvitedFriend(friend.id)} className="text-[#B3261E] p-2 hover:bg-[#B3261E]/10 rounded-full">
+                                    <X size={16} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                 )}
             </div>
           </div>
+
+          <div className="space-y-6">
+             {/* Players List */}
+             <div className="bg-white/80 backdrop-blur-md rounded-[32px] p-8 border border-[#CAC4D0] shadow-sm animate-card flex flex-col h-full min-h-[500px]">
+                 <div className="flex items-center gap-4 mb-6">
+                        <div className="w-12 h-12 rounded-full bg-[#FFD8E4] flex items-center justify-center text-[#31111D]">
+                            <Users size={24} />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-[#1C1B1F]">Lobby</h2>
+                            <p className="text-[#49454F] text-sm">{players.length} / {roomSettings.maxPlayers} Players</p>
+                        </div>
+                 </div>
+
+                 <div className="flex-1 space-y-3 overflow-y-auto pr-2">
+                     {players.length === 0 ? (
+                        <p className="text-center text-[#49454F] mt-10">Waiting for players...</p>
+                     ) : (
+                        players.map(player => (
+                            <div key={player.id} className="flex items-center gap-4 p-3 rounded-2xl bg-[#F3EDF7]">
+                                <div className="w-10 h-10 rounded-full bg-[#6750A4] text-white flex items-center justify-center font-bold relative">
+                                    {player.name.charAt(0).toUpperCase()}
+                                    {player.name === host && (
+                                        <div className="absolute -top-1 -right-1 bg-[#FFD8E4] text-[#31111D] p-1 rounded-full shadow-sm">
+                                            <Crown size={12} />
+                                        </div>
+                                    )}
+                                </div>
+                                <div>
+                                    <p className="font-bold text-[#1C1B1F] text-sm">{player.name}</p>
+                                    <p className="text-xs text-[#49454F]">Ready</p>
+                                </div>
+                            </div>
+                        ))
+                     )}
+                 </div>
+             </div>
+          </div>
+        </div>
+
+        {/* Start Button */}
+        <div className="flex justify-center mt-12 mb-20 animate-card">
+            <button
+                ref={createButtonRef}
+                onClick={handleStartGame}
+                 disabled={typeof roomSettings.name !== "string" || !roomSettings.name.trim()}
+                 className={`
+                    group relative px-12 py-5 rounded-full text-xl font-bold flex items-center gap-3 shadow-lg transition-all duration-300
+                    ${(typeof roomSettings.name !== "string" || !roomSettings.name.trim()) 
+                        ? 'bg-[#E7E0EC] text-[#1C1B1F]/50 cursor-not-allowed' 
+                        : 'bg-[#6750A4] text-white hover:bg-[#523E8E] hover:scale-105 hover:shadow-[#6750A4]/30'
+                    }
+                 `}
+            >
+                <span>Start Game</span>
+                <Play className="fill-current w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            </button>
         </div>
 
         {/* FriendsChat for lobby chat */}
         <FriendsChat roomCode={roomCode} username={username} />
 
-        {/* Players in Lobby */}
-        <div ref={friendsRef} className="bg-white rounded-3xl p-8 shadow-lg">
-          <div className="flex items-center space-x-4 mb-8">
-            <div className="w-14 h-14 bg-[#06d6a0] rounded-full flex items-center justify-center">
-              <Users className="w-7 h-7 text-white" />
-            </div>
-            <h2 className="text-2xl font-bold text-[#073b4c]">
-              Players in Lobby
-            </h2>
-          </div>
-
-          <div className="space-y-4">
-            {players.length === 0 ? (
-              <p className="text-gray-500 text-center py-12 text-lg">
-                Waiting for other players to join...
-              </p>
-            ) : (
-              players.map((player) => (
-                <div
-                  key={player.id}
-                  className="flex items-center space-x-4 p-4 rounded-2xl bg-gray-100"
-                >
-                  <div className="w-12 h-12 bg-[#06d6a0] rounded-full flex items-center justify-center text-white font-bold">
-                    {player.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-[#073b4c]">
-                      {player.name}{" "}
-                      {player.name === host && (
-                        <span className="text-yellow-400">
-                          {" "}
-                          <Crown className="w-3 h-3" />
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-sm text-[#06d6a0]">Online</p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Create Button */}
-      <div className="mt-12 flex justify-center">
-        <button
-          ref={createButtonRef}
-          onClick={handleStartGame}
-          disabled={
-            typeof roomSettings.name !== "string" || !roomSettings.name.trim()
-          }
-          className="bg-[#ef476f] text-white px-16 py-5 rounded-full font-bold text-xl hover:bg-[#e63946] transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg"
-          onMouseEnter={(e) => {
-            if (!e.currentTarget.disabled) {
-              gsap.to(e.currentTarget, { y: -3, duration: 0.3 });
-            }
-          }}
-          onMouseLeave={(e) => {
-            gsap.to(e.currentTarget, { y: 0, duration: 0.3 });
-          }}
-        >
-          Start Playing
-        </button>
-      </div>
-
-      {/* Invite Friends Modal */}
-      {showInviteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full mx-4 max-h-96 overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-[#073b4c]">
-                Invite Friends
-              </h3>
-              <button
-                onClick={() => setShowInviteModal(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {getAvailableFriends().length === 0 ? (
-                <p className="text-gray-500 text-center py-8">
-                  No friends available to invite.
-                </p>
-              ) : (
-                getAvailableFriends().map((friend) => (
-                  <div
-                    key={friend.id}
-                    className="flex items-center justify-between p-4 rounded-2xl bg-gray-50"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-[#06d6a0] rounded-full flex items-center justify-center text-white font-bold">
-                        {friend.avatar ||
-                          friend.username.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="font-bold text-[#073b4c]">
-                          {friend.username}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {friend.isOnline ? "Online" : "Offline"}
-                        </p>
-                      </div>
+        {/* Invite Friends Modal */}
+        {showInviteModal && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+                <div className="bg-[#FDF8FC] rounded-[28px] p-6 w-full max-w-md shadow-2xl animate-card">
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-xl font-bold text-[#1C1B1F]">Invite Friends</h3>
+                        <button onClick={() => setShowInviteModal(false)} className="p-2 hover:bg-[#E7E0EC] rounded-full text-[#49454F]">
+                            <X size={20} />
+                        </button>
                     </div>
-                    <button
-                      onClick={() =>
-                        handleInviteFriend(friend.id, friend.username)
-                      }
-                      className="bg-[#06d6a0] text-white px-4 py-2 rounded-full font-bold hover:bg-[#05c090] transition-all duration-300"
-                    >
-                      Invite
-                    </button>
-                  </div>
-                ))
-              )}
+                    
+                    <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+                        {getAvailableFriends().length === 0 ? (
+                            <p className="text-center text-[#49454F] py-8">No friends available.</p>
+                        ) : (
+                            getAvailableFriends().map(friend => (
+                                <div key={friend.id} className="flex items-center justify-between p-3 rounded-2xl hover:bg-[#F3EDF7] transition-colors">
+                                     <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-[#EADDFF] text-[#21005D] flex items-center justify-center font-bold">
+                                            {friend.avatar || friend.username.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-[#1C1B1F] text-sm">{friend.username}</p>
+                                            <p className="text-xs text-[#49454F]">{friend.isOnline ? "Online" : "Offline"}</p>
+                                        </div>
+                                     </div>
+                                     <button 
+                                        onClick={() => handleInviteFriend(friend.id, friend.username)}
+                                        className="bg-[#6750A4] text-white px-4 py-2 rounded-full text-xs font-bold hover:bg-[#523E8E] transition-colors"
+                                     >
+                                        Invite
+                                     </button>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
             </div>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

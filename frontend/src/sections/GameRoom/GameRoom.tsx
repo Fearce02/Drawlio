@@ -139,18 +139,6 @@ export const GameRoom: React.FC = () => {
     }
   }, [roomCode, currentPlayerName, isGuest]);
 
-  // Initialize canvas when component mounts
-  // useEffect(() => {
-  //   const canvas = canvasRef.current;
-  //   if (canvas) {
-  //     const ctx = canvas.getContext("2d");
-  //     if (ctx) {
-  //       // Set white background
-  //       ctx.fillStyle = "#ffffff";
-  //       ctx.fillRect(0, 0, canvas.width, canvas.height);
-  //     }
-  //   }
-  // }, []);
 
   useEffect(() => {
     if (gridRef.current) {
@@ -172,10 +160,6 @@ export const GameRoom: React.FC = () => {
 
   useEffect(() => {
     if (gameState.timeLeft > 0 && gameState.gamePhase === "drawing") {
-      console.log(
-        "[Timer] Starting countdown with timeLeft:",
-        gameState.timeLeft,
-      );
       const timer = setTimeout(() => {
         setGameState((prev) => ({
           ...prev,
@@ -183,16 +167,22 @@ export const GameRoom: React.FC = () => {
         }));
       }, 1000);
       return () => clearTimeout(timer);
-    } else if (gameState.timeLeft === 0 && gameState.gamePhase === "drawing") {
-      console.log("[Timer] Time's up!");
     }
   }, [gameState.timeLeft, gameState.gamePhase]);
+  
+  // Helper to find player avatar
+  const getPlayerAvatar = (username: string) => {
+      const player = players.find(p => p.name === username);
+      return player?.avatar;
+  };
 
   const handleSendMessage = useCallback(
     (message: string) => {
       if (!roomCode) return;
 
       // Add message to local chat immediately
+      const myAvatar = getPlayerAvatar(currentPlayerName);
+      
       setMessages((prev) => [
         ...prev,
         {
@@ -202,38 +192,21 @@ export const GameRoom: React.FC = () => {
           message,
           timestamp: Date.now(),
           isSystemMessage: false,
+          avatar: myAvatar,
         },
       ]);
 
       socket.emit("sendGuess", { roomCode, message });
     },
-    [roomCode, currentPlayerName],
+    [roomCode, currentPlayerName, players],
   );
 
   useEffect(() => {
-    socket.on("GameStarted", (data) => {
-      console.log("[GameStarted] received:", data);
-      setGameState((prev) => ({
-        ...prev,
-        isActive: true,
-        gamePhase: "waiting",
-      }));
-    });
+    const handleGameStarted = (data: any) => {
+         setGameState((prev) => ({ ...prev, isActive: true, gamePhase: "waiting" }));
+    };
 
-    socket.on("NewTurn", (data) => {
-      console.log("[NewTurn] received:", data);
-      console.log("[NewTurn] Current player:", currentPlayerName);
-      console.log("[NewTurn] Drawer:", data.drawer);
-      console.log(
-        "[NewTurn] Is current player drawing:",
-        data.drawer === currentPlayerName,
-      );
-      console.log(
-        "[NewTurn] time value:",
-        data.time,
-        "type:",
-        typeof data.time,
-      );
+    const handleNewTurn = (data: any) => {
       setGameState((prev) => ({
         ...prev,
         currentDrawer: data.drawer,
@@ -255,31 +228,17 @@ export const GameRoom: React.FC = () => {
           isSystemMessage: true,
         },
       ]);
-    });
+    };
 
-    socket.on("drawing", (data) => {
-      console.log("[drawing] received:", data);
-      // The DrawingCanvas component handles the drawing events
-      // This is just for debugging
-    });
-
-    socket.on("clearCanvas", () => {
-      console.log("[clearCanvas] received");
-      // The DrawingCanvas component handles the clear events
-      // This is just for debugging
-    });
-
-    socket.on("WordToDraw", (word: string) => {
-      console.log("[WordToDraw] received:", word);
-      console.log("[WordToDraw] Current player:", currentPlayerName);
+    const handleWordToDraw = (word: string) => {
       setGameState((prev) => ({
         ...prev,
         currentWord: word,
         gamePhase: "drawing",
       }));
-    });
+    };
 
-    socket.on("CorrectGuess", ({ username, message }) => {
+    const handleCorrectGuess = ({ username, message }: any) => {
       setMessages((prev) => [
         ...prev,
         {
@@ -292,11 +251,13 @@ export const GameRoom: React.FC = () => {
           isCorrectGuess: true,
         },
       ]);
-    });
+    };
 
-    socket.on("ChatMessage", ({ username, message }) => {
+    const handleChatMessage = ({ username, message }: any) => {
       // Don't add duplicate messages (since we already add local messages)
       if (username !== currentPlayerName) {
+        const avatar = getPlayerAvatar(username);
+        
         setMessages((prev) => [
           ...prev,
           {
@@ -306,12 +267,13 @@ export const GameRoom: React.FC = () => {
             message,
             timestamp: Date.now(),
             isSystemMessage: false,
+            avatar,
           },
         ]);
       }
-    });
+    };
 
-    socket.on("GameOver", ({ players }) => {
+    const handleGameOver = ({ players }: any) => {
       // Map backend player objects to frontend Player type
       const mappedPlayers = players.map((p: any, i: number) => ({
         id: p.id || p.socketId || p.username || `player-${i}`,
@@ -319,15 +281,16 @@ export const GameRoom: React.FC = () => {
         score: p.score ?? 0,
         isDrawing: p.isDrawing ?? false,
         isConnected: p.isConnected ?? true,
+        avatar: p.avatar,
       }));
       setFinalPlayers(mappedPlayers);
       setGameState((prev) => ({
         ...prev,
         gamePhase: "finished",
       }));
-    });
+    };
 
-    socket.on("playAgainVote", (data: { votes: number; total: number }) => {
+    const handlePlayAgainVote = (data: { votes: number; total: number }) => {
       const { votes, total } = data;
       setPlayAgainVotes(votes);
       // If all players voted, navigate to appropriate lobby
@@ -338,20 +301,26 @@ export const GameRoom: React.FC = () => {
           navigate("/friends-lobby");
         }
       }
-    });
+    };
+
+    socket.on("GameStarted", handleGameStarted);
+    socket.on("NewTurn", handleNewTurn);
+    socket.on("WordToDraw", handleWordToDraw);
+    socket.on("CorrectGuess", handleCorrectGuess);
+    socket.on("ChatMessage", handleChatMessage);
+    socket.on("GameOver", handleGameOver);
+    socket.on("playAgainVote", handlePlayAgainVote);
 
     return () => {
-      socket.off("GameStarted");
-      socket.off("NewTurn");
-      socket.off("drawing");
-      socket.off("clearCanvas");
-      socket.off("WordToDraw");
-      socket.off("CorrectGuess");
-      socket.off("ChatMessage");
-      socket.off("GameOver");
-      socket.off("playAgainVote");
+      socket.off("GameStarted", handleGameStarted);
+      socket.off("NewTurn", handleNewTurn);
+      socket.off("WordToDraw", handleWordToDraw);
+      socket.off("CorrectGuess", handleCorrectGuess);
+      socket.off("ChatMessage", handleChatMessage);
+      socket.off("GameOver", handleGameOver);
+      socket.off("playAgainVote", handlePlayAgainVote);
     };
-  }, [players.length, navigate, currentPlayerName, isGuest]);
+  }, [players, navigate, currentPlayerName, isGuest]); // Added players to dep array so getPlayerAvatar works
 
   const handlePlayAgain = () => {
     socket.emit("playAgain", { roomCode });
@@ -374,6 +343,7 @@ export const GameRoom: React.FC = () => {
           username: p.name, // GameOver expects username
           score: p.score,
           isCurrentPlayer: p.name === currentPlayerName,
+          avatar: p.avatar,
         }))}
         onPlayAgain={handlePlayAgain}
         onExit={handleExit}
@@ -386,9 +356,15 @@ export const GameRoom: React.FC = () => {
   return (
     <div
       ref={gameRoomRef}
-      className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 p-4"
+      className="min-h-screen bg-[#FDF8FC] relative p-4 overflow-hidden"
     >
-      <div className="max-w-7xl mx-auto">
+        {/* Background Orbs */}
+       <div className="absolute inset-0 pointer-events-none overflow-hidden -z-10">
+            <div className="absolute top-[-10%] left-[-10%] w-[60vw] h-[60vw] rounded-full bg-[#D0BCFF] opacity-20 blur-[100px]" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] rounded-full bg-[#EFB8C8] opacity-20 blur-[80px]" />
+      </div>
+
+      <div className="max-w-[1600px] mx-auto h-full flex flex-col">
         <GameHeader
           gameState={gameState}
           playerCount={players.length}
@@ -397,27 +373,28 @@ export const GameRoom: React.FC = () => {
 
         <div
           ref={gridRef}
-          className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[calc(100vh-140px)]"
+          className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-0"
         >
-          {/* Left Column - Players */}
-          <div className="lg:col-span-1">
+          {/* Left Column - Players (2 cols) */}
+          <div className="lg:col-span-3 overflow-hidden">
             <PlayerList
               players={players}
               currentDrawerId={gameState.currentDrawer}
             />
           </div>
 
-          {/* Center Column - Canvas and Tools */}
-          <div className="lg:col-span-2 space-y-4">
-            <DrawingCanvas
-              isCurrentPlayerDrawing={isCurrentPlayerDrawing}
-              currentTool={currentTool}
-              currentColor={currentColor}
-              brushSize={brushSize}
-              roomCode={roomCode}
-              // onDrawingChange={handleDrawingChange}
-            />
-
+          {/* Center Column - Canvas (6 cols) */}
+          <div className="lg:col-span-6 flex flex-col gap-4">
+            <div className="flex-1 min-h-[400px] bg-white rounded-[24px] shadow-sm border border-[#CAC4D0] overflow-hidden relative">
+                <DrawingCanvas
+                isCurrentPlayerDrawing={isCurrentPlayerDrawing}
+                currentTool={currentTool}
+                currentColor={currentColor}
+                brushSize={brushSize}
+                roomCode={roomCode}
+                />
+            </div>
+            
             <DrawingToolbar
               currentTool={currentTool}
               currentColor={currentColor}
@@ -429,8 +406,8 @@ export const GameRoom: React.FC = () => {
             />
           </div>
 
-          {/* Right Column - Chat */}
-          <div className="lg:col-span-1 h-full overflow-hidden">
+          {/* Right Column - Chat (4 cols) */}
+          <div className="lg:col-span-3 overflow-hidden">
             <ChatBox
               messages={messages}
               onSendMessage={handleSendMessage}

@@ -31,12 +31,14 @@
 ### 1. Timer Starting at 0
 
 - **Problem**: Timer starts at 0 seconds instead of configured duration
-- **Status**: Added debugging logs, need to investigate backend timer logic
+- **Fix**: Implemented game state sync for joining/reconnecting players in `joinGameRoom` handler. Now calculates remaining time and sends `NewTurn` event on join.
+- **Test**: Join an active game with a second window/browser. The timer should show the correct remaining time.
 
 ### 2. Backend Drawer Prevention
 
 - **Problem**: Drawer can still send guesses through backend API
-- **Status**: Frontend prevents it, but backend should also block it
+- **Fix**: Added validation in `sendGuess` handler to check if the sender is the current drawer.
+- **Test**: As drawer, try to send the correct word in chat. It should be ignored by the backend (no score, no success message).
 
 ## 🧪 Testing Instructions:
 

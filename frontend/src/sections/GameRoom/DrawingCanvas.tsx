@@ -15,6 +15,10 @@ interface DrawingCanvasProps {
   roomCode: string;
 }
 
+// SVG Cursors
+const PENCIL_cursor = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%23000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>') 0 24, auto`;
+const ERASER_cursor = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%23000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20.5H9l-7-7 7-7 11.5 11.5a2.5 2.5 0 0 1 0 3.5H20v2.5z"></path></svg>') 12 12, auto`;
+
 export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   isCurrentPlayerDrawing,
   currentTool,
@@ -181,6 +185,12 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     };
   }, []);
 
+  const getCursor = () => {
+    if (!isCurrentPlayerDrawing) return "default";
+    if (currentTool === "eraser") return ERASER_cursor;
+    return PENCIL_cursor; 
+  };
+
   return (
     <div
       ref={containerRef}
@@ -205,11 +215,12 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           height={500}
           className={`w-full h-auto border-2 border-gray-300 rounded-lg transition-all duration-300 ${
             isCurrentPlayerDrawing
-              ? "cursor-crosshair border-blue-300"
+              ? "border-blue-300 shadow-md"
               : "cursor-default"
           }`}
           style={{
             pointerEvents: isCurrentPlayerDrawing ? "auto" : "none",
+            cursor: getCursor()
           }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}

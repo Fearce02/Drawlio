@@ -7,6 +7,7 @@ interface Player {
   username: string;
   score: number;
   isCurrentPlayer?: boolean;
+  avatar?: string;
 }
 
 interface GameOverProps {
@@ -95,155 +96,146 @@ export const GameOver: React.FC<GameOverProps> = ({
   const getRankIcon = (rank: number) => {
     switch (rank) {
       case 1:
-        return <Crown className="w-6 h-6 text-yellow-500" />;
+        return <Crown className="w-6 h-6 text-[#FFD700]" />;
       case 2:
-        return <Medal className="w-6 h-6 text-gray-400" />;
+        return <Medal className="w-6 h-6 text-[#A0A0A0]" />;
       case 3:
-        return <Award className="w-6 h-6 text-amber-600" />;
+        return <Award className="w-6 h-6 text-[#CD7F32]" />;
       default:
-        return <div className="w-6 h-6 flex items-center justify-center text-gray-600 font-bold">{rank}</div>;
+        return <div className="w-6 h-6 flex items-center justify-center text-[#49454F] font-bold">{rank}</div>;
     }
   };
 
   const getRankColor = (rank: number) => {
     switch (rank) {
-      case 1:
-        return "from-yellow-400 to-yellow-600 text-white";
-      case 2:
-        return "from-gray-300 to-gray-500 text-white";
-      case 3:
-        return "from-amber-400 to-amber-600 text-white";
-      default:
-        return "from-blue-100 to-blue-200 text-blue-900";
+      case 1: return "bg-[#FFD700] text-[#725C00]";
+      case 2: return "bg-[#E0E0E0] text-[#1C1B1F]";
+      case 3: return "bg-[#FFDBC8] text-[#5D4037]";
+      default: return "bg-[#E7E0EC] text-[#49454F]";
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 p-4 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#FDF8FC] overflow-y-auto py-10">
       {/* Confetti Background */}
-      <div ref={confettiRef} className="fixed inset-0 pointer-events-none z-0">
+      <div ref={confettiRef} className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
         {[...Array(20)].map((_, i) => (
           <div
             key={i}
-            className="absolute w-3 h-3 bg-gradient-to-r from-pink-400 to-yellow-400 rounded-full"
+            className="absolute w-3 h-3 rounded-full"
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
+              backgroundColor: ['#6750A4', '#D0BCFF', '#FFD8E4', '#7D5260'][Math.floor(Math.random() * 4)],
               animationDelay: `${Math.random() * 2}s`
             }}
           />
         ))}
+         <div className="absolute top-[-10%] left-[-10%] w-[60vw] h-[60vw] rounded-full bg-[#D0BCFF] opacity-20 blur-[100px]" />
+         <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] rounded-full bg-[#EFB8C8] opacity-20 blur-[80px]" />
       </div>
 
       <div
         ref={containerRef}
-        className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 max-w-2xl w-full mx-auto border border-white/20 relative z-10"
+        className="bg-white/80 backdrop-blur-xl rounded-[32px] shadow-xl p-8 max-w-2xl w-full mx-4 border border-[#E7E0EC] relative z-10"
       >
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-10">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <Trophy className="w-10 h-10 text-yellow-500" />
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-              Game Over!
-            </h1>
-            <Trophy className="w-10 h-10 text-yellow-500" />
+            <Trophy className="w-12 h-12 text-[#FFD700]" />
           </div>
+          <h1 className="text-4xl font-bold text-[#1C1B1F] mb-2 tracking-tight">
+            Game Over!
+          </h1>
           
-          <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-2xl inline-block">
-            <p className="text-lg font-semibold">
+          <div className="bg-[#6750A4] text-white px-8 py-3 rounded-full inline-block shadow-md">
+            <p className="text-lg font-bold flex items-center gap-2">
+               {winner.avatar && <img src={winner.avatar} alt="Winner" className="w-8 h-8 rounded-full bg-white object-cover" />}
               🎉 {winner.username} Wins! 🎉
             </p>
-            <p className="text-sm opacity-90">
+          </div>
+           <p className="text-sm text-[#49454F] mt-4 font-medium">
               {totalRounds} rounds completed • {players.length} players
             </p>
-          </div>
         </div>
 
         {/* Current Player Stats */}
-        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-2xl p-6 mb-6">
-          <div className="flex items-center justify-between">
+        <div className="bg-[#EADDFF] text-[#21005D] rounded-[24px] p-6 mb-8 border border-[#D0BCFF] flex items-center justify-between">
             <div>
               <h3 className="text-xl font-bold">Your Result</h3>
-              <p className="text-lg opacity-90">Rank #{currentPlayerRank} • {currentPlayerScore} points</p>
-            </div>
+              <p className="text-sm opacity-80">Rank #{currentPlayerRank}</p>
+            </div> 
             <div className="text-right">
-              {getRankIcon(currentPlayerRank)}
+                <p className="text-3xl font-bold">{currentPlayerScore}</p>
+                <p className="text-sm opacity-80 uppercase tracking-wider font-medium">Points</p>
             </div>
-          </div>
         </div>
 
         {/* Leaderboard */}
         <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <Users className="w-5 h-5 text-gray-600" />
-            <h2 className="text-xl font-bold text-gray-800">Final Leaderboard</h2>
+          <div className="flex items-center gap-2 mb-4 px-2">
+            <Users className="w-5 h-5 text-[#6750A4]" />
+            <h2 className="text-lg font-bold text-[#1C1B1F]">Leaderboard</h2>
           </div>
           
-          <div ref={leaderboardRef} className="space-y-3">
+          <div ref={leaderboardRef} className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
             {sortedPlayers.map((player, index) => (
               <div
                 key={player.id}
-                className={`flex items-center justify-between p-4 rounded-xl transition-all duration-200 hover:scale-[1.02] ${
+                className={`flex items-center justify-between p-4 rounded-[20px] transition-all duration-200 ${
                   player.username === currentPlayerName
-                    ? 'ring-2 ring-blue-500 bg-blue-50'
-                    : 'bg-gray-50 hover:bg-gray-100'
+                    ? 'bg-[#F3EDF7] border border-[#6750A4] ring-1 ring-[#6750A4]'
+                    : 'bg-white border border-[#E7E0EC] hover:bg-[#F3EDF7]'
                 }`}
               >
                 <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${getRankColor(index + 1)} flex items-center justify-center shadow-lg`}>
-                    {getRankIcon(index + 1)}
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold shadow-sm overflow-hidden ${getRankColor(index + 1)}`}>
+                    {player.avatar ? (
+                         <img src={player.avatar} alt={player.username} className="w-full h-full object-cover" />
+                    ) : (
+                        index + 1
+                    )}
                   </div>
                   <div>
-                    <p className="font-bold text-gray-800">
+                    <p className="font-bold text-[#1C1B1F] text-lg">
                       {player.username}
                       {player.username === currentPlayerName && (
-                        <span className="text-blue-600 ml-2">(You)</span>
+                        <span className="text-[#6750A4] text-sm ml-2 font-medium">(You)</span>
                       )}
                     </p>
-                    <p className="text-sm text-gray-600">{player.score} points</p>
                   </div>
                 </div>
                 
-                {index === 0 && (
-                  <div className="flex gap-1">
-                    <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-                    <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                    <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                  </div>
-                )}
+                <div className="flex items-center gap-3">
+                    <span className="font-bold text-[#1C1B1F]">{player.score} pts</span>
+                    {index < 3 && getRankIcon(index + 1)}
+                </div>
               </div>
             ))}
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div ref={buttonsRef} className="flex flex-col sm:flex-row gap-4">
+        <div ref={buttonsRef} className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-[#E7E0EC]">
           <button
             onClick={onPlayAgain}
-            className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-4 rounded-2xl font-bold text-lg
-                     hover:from-green-600 hover:to-emerald-700 transform hover:scale-105 transition-all duration-200
-                     shadow-lg hover:shadow-xl flex items-center justify-center gap-3 group"
+            className="flex-1 bg-[#6750A4] text-white px-8 py-4 rounded-full font-bold text-lg
+                     hover:bg-[#523E8E] transform hover:scale-[1.02] transition-all duration-200
+                     shadow-md flex items-center justify-center gap-3"
           >
-            <RotateCcw className="w-6 h-6 group-hover:rotate-180 transition-transform duration-300" />
+            <RotateCcw className="w-5 h-5" />
             Play Again
           </button>
           
           <button
             onClick={onExit}
-            className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 text-white px-8 py-4 rounded-2xl font-bold text-lg
-                     hover:from-gray-600 hover:to-gray-700 transform hover:scale-105 transition-all duration-200
-                     shadow-lg hover:shadow-xl flex items-center justify-center gap-3 group"
+            className="flex-1 bg-white text-[#6750A4] border border-[#79747E] px-8 py-4 rounded-full font-bold text-lg
+                     hover:bg-[#F3EDF7] transform hover:scale-[1.02] transition-all duration-200
+                     flex items-center justify-center gap-3"
           >
-            <LogOut className="w-6 h-6 group-hover:translate-x-1 transition-transform duration-200" />
+            <LogOut className="w-5 h-5" />
             Exit to Lobby
           </button>
-        </div>
-
-        {/* Footer */}
-        <div className="text-center mt-6 pt-6 border-t border-gray-200">
-          <p className="text-gray-500 text-sm">
-            Thanks for playing! 🎨✨
-          </p>
         </div>
       </div>
     </div>

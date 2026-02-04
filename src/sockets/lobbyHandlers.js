@@ -303,6 +303,33 @@ export const handleLobbySockets = (io, socket) => {
         `[joinGameRoom] All players joined. Starting game for room: ${roomCode}`,
       );
       await startNextTurn(io, roomCode);
+    } else if (room.gameState && room.gameState.isActive) {
+      // Game is already active, sync the new/reconnecting player
+      console.log(`[joinGameRoom] Syncing player ${username} to active game`);
+      
+      const now = Date.now();
+      // Calculate remaining time
+      let timeLeft = room.settings.roundDuration;
+      if (room.gameState.roundStartTime) {
+        const timeElapsed = (now - room.gameState.roundStartTime) / 1000;
+        timeLeft = Math.max(0, Math.ceil(room.settings.roundDuration - timeElapsed));
+      }
+      
+      const currentDrawer = room.players[room.gameState.drawerIndex];
+
+      // Emit State Sync
+      io.to(socket.id).emit("NewTurn", {
+        drawer: currentDrawer.username,
+        maskedWord: maskWord(room.gameState.currentWord),
+        round: room.gameState.currentRound,
+        totalRounds: room.settings.totalRounds,
+        time: timeLeft,
+      });
+
+      // If this player is the drawer, send the word
+      if (username === currentDrawer.username) {
+        io.to(socket.id).emit("WordToDraw", room.gameState.currentWord);
+      }
     }
   });
 
@@ -326,6 +353,13 @@ export const handleLobbySockets = (io, socket) => {
       room.gameState.playersGuessedCorrectly.includes(player.username)
     )
       return;
+
+    // Check if the sender is the current drawer
+    const currentDrawer = room.players[room.gameState.drawerIndex];
+    if (currentDrawer && player.username === currentDrawer.username) {
+      // Drawer cannot guess their own word
+      return;
+    }
 
     const isCorrect =
       message.trim().toLowerCase() === room.gameState.currentWord.toLowerCase();

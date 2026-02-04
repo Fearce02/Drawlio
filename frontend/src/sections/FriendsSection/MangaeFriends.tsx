@@ -11,8 +11,6 @@ import {
   UserPlus as AddUserIcon,
 } from "lucide-react";
 import { gsap } from "gsap";
-// @ts-ignore
-// import { fadeInUp, slideInFromLeft, staggerFadeIn } from "../hooks/useGSAP";
 import {
   getFriendsList,
   sendFriendRequest,
@@ -60,10 +58,17 @@ const ManageFriends: React.FC<ManageFriendsProps> = ({ onBack }) => {
   const token = localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user") || "null");
 
-  const headerRef = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<HTMLDivElement>(null);
-  const tabsRef = useRef<HTMLDivElement>(null);
-  const friendsListRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+        gsap.fromTo(".animate-item", 
+            { opacity: 0, y: 20 },
+            { opacity: 1, y: 0, duration: 0.6, stagger: 0.1, ease: "power2.out" }
+        );
+    }, containerRef);
+    return () => ctx.revert();
+  }, [])
 
   // Fetch friends data
   const fetchFriends = async () => {
@@ -82,11 +87,9 @@ const ManageFriends: React.FC<ManageFriendsProps> = ({ onBack }) => {
 
   useEffect(() => {
     fetchFriends();
-    // Real-time: Notify backend this user is online
     if (user && user.id) {
       (socket as any).emit("user_online", { userId: user.id });
     }
-    // Listen for friend status updates
     const handleStatusUpdate = ({
       userId,
       status,
@@ -134,7 +137,6 @@ const ManageFriends: React.FC<ManageFriendsProps> = ({ onBack }) => {
     setSearchLoading(false);
   };
 
-  // Friend actions
   const handleSendRequest = async (userId: string) => {
     try {
       await sendFriendRequest(userId, token);
@@ -163,7 +165,6 @@ const ManageFriends: React.FC<ManageFriendsProps> = ({ onBack }) => {
     } catch {}
   };
 
-  // Filtering
   const filteredFriends = friends.filter((friend) => {
     const matchesSearch = friend.username
       .toLowerCase()
@@ -177,332 +178,201 @@ const ManageFriends: React.FC<ManageFriendsProps> = ({ onBack }) => {
   const onlineCount = friends.filter((f) => f.status === "online").length;
   const offlineCount = friends.filter((f) => f.status === "offline").length;
 
+
   // UI helpers
   const getStatusColor = (status?: string) => {
     switch (status) {
-      case "online":
-        return "bg-[#06d6a0]";
-      case "in-game":
-        return "bg-[#ffd166]";
-      case "offline":
-        return "bg-gray-400";
-      default:
-        return "bg-gray-400";
+      case "online": return "bg-[#06d6a0]";
+      case "in-game": return "bg-[#ffd166]";
+      default: return "bg-gray-400";
     }
   };
   const getStatusText = (status?: string) => {
     switch (status) {
-      case "online":
-        return "Online";
-      case "in-game":
-        return "In Game";
-      case "offline":
-        return "Offline";
-      default:
-        return "Unknown";
+      case "online": return "Online";
+      case "in-game": return "In Game";
+      default: return "Offline";
     }
   };
 
-  const handleFriendHover = (e: React.MouseEvent<HTMLDivElement>) => {
-    gsap.to(e.currentTarget, {
-      x: 10,
-      scale: 1.02,
-      duration: 0.3,
-      ease: "power2.out",
-    });
-  };
-
-  const handleFriendLeave = (e: React.MouseEvent<HTMLDivElement>) => {
-    gsap.to(e.currentTarget, {
-      x: 0,
-      scale: 1,
-      duration: 0.3,
-      ease: "power2.out",
-    });
-  };
-
   return (
-    <div className="max-w-5xl mx-auto px-6 py-8">
-      {/* Header */}
-      <div ref={headerRef} className="flex items-center justify-between mb-8">
-        <button
-          onClick={onBack}
-          className="flex items-center space-x-3 text-[#073b4c] hover:text-[#ef476f] transition-all duration-300 font-medium transform hover:scale-105"
-          onMouseEnter={(e) => {
-            gsap.to(e.currentTarget.querySelector("svg"), {
-              x: -5,
-              duration: 0.3,
-            });
-          }}
-          onMouseLeave={(e) => {
-            gsap.to(e.currentTarget.querySelector("svg"), {
-              x: 0,
-              duration: 0.3,
-            });
-          }}
-        >
-          <ArrowLeft className="w-6 h-6" />
-          <span className="text-lg">Back to Home</span>
-        </button>
-        {/* Add Friend Search */}
-        <div className="flex items-center space-x-2">
-          <input
-            type="text"
-            placeholder="Search users..."
-            value={searchTerm}
-            onChange={handleSearch}
-            className="w-64 pl-4 pr-4 py-2 border-2 border-gray-200 rounded-full focus:outline-none focus:border-[#118ab2] text-lg transition-all duration-300 focus:scale-105"
-          />
-          <UserPlus className="w-6 h-6 text-[#ef476f]" />
-        </div>
+    <div ref={containerRef} className="max-w-6xl mx-auto px-6 py-10 min-h-screen">
+      {/* Background Orbs */}
+       <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+            <div className="absolute top-[20%] left-[20%] w-[60vw] h-[60vw] rounded-full bg-[#D0BCFF] opacity-20 blur-[100px]" />
       </div>
 
-      {/* Search Results */}
-      {searchTerm && searchResults.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-lg p-4 mb-8">
-          <h3 className="text-xl font-bold mb-2 text-[#073b4c]">
-            Search Results
-          </h3>
-          {searchLoading ? (
-            <p>Loading...</p>
-          ) : (
-            <ul>
-              {searchResults.map((user) => (
-                <li
-                  key={user._id}
-                  className="flex items-center justify-between py-2 border-b last:border-b-0"
-                >
-                  <div className="flex items-center space-x-3">
-                    {user.avatar && user.avatar.trim() !== "" ? (
-                      <img
-                        src={user.avatar}
-                        alt={user.username}
-                        className="w-10 h-10 rounded-full object-cover"
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8 animate-item">
+         <button
+            onClick={onBack}
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow-sm text-[#21005D] hover:bg-[#EADDFF] transition-colors font-bold"
+         >
+            <ArrowLeft size={18} />
+            <span>Dashboard</span>
+         </button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Column: Search & Friend Requests */}
+          <div className="space-y-6 lg:col-span-1">
+             {/* Search */}
+             <div className="bg-white/80 backdrop-blur-md rounded-[32px] p-6 border border-[#CAC4D0] shadow-sm animate-item">
+                  <h2 className="text-xl font-bold text-[#1C1B1F] mb-4 flex items-center gap-2">
+                      <UserPlus className="text-[#6750A4]" />
+                      Add Friends
+                  </h2>
+                  <div className="relative">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#49454F]" size={20}/>
+                      <input
+                        type="text"
+                        placeholder="Search by username..."
+                        value={searchTerm}
+                        onChange={handleSearch}
+                        className="w-full bg-[#F3EDF7] rounded-full pl-12 pr-4 py-3 text-[#1C1B1F] placeholder:text-[#49454F]/60 outline-none focus:ring-2 focus:ring-[#6750A4]"
                       />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-2xl bg-gradient-to-br from-blue-400 to-purple-500">
-                        {user.firstName && user.firstName[0]
-                          ? user.firstName[0].toUpperCase()
-                          : user.username[0].toUpperCase()}
+                  </div>
+
+                  {/* Search Results */}
+                  {searchTerm && searchResults.length > 0 && (
+                      <div className="mt-4 space-y-2 max-h-[300px] overflow-y-auto">
+                           {searchResults.map((user) => (
+                                <div key={user._id} className="flex items-center justify-between p-3 rounded-2xl bg-[#F3EDF7] hover:bg-[#EADDFF]/50 transition-colors">
+                                     <div className="flex items-center gap-3">
+                                          <div className="w-10 h-10 rounded-full bg-[#6750A4] text-white flex items-center justify-center font-bold">
+                                              {user.avatar || user.username.charAt(0).toUpperCase()}
+                                          </div>
+                                          <div className="overflow-hidden">
+                                              <p className="text-sm font-bold text-[#1C1B1F] truncate">{user.username}</p>
+                                          </div>
+                                     </div>
+                                     <button
+                                        onClick={() => handleSendRequest(user._id)}
+                                        disabled={user.sent}
+                                        className={`p-2 rounded-full ${user.sent ? "bg-[#E8DEF8] text-[#49454F]" : "bg-[#6750A4] text-white hover:bg-[#523E8E]"}`}
+                                     >
+                                         {user.sent ? <Check size={16}/> : <AddUserIcon size={16}/>}
+                                     </button>
+                                </div>
+                           ))}
                       </div>
-                    )}
-                    <span className="font-medium text-[#073b4c]">
-                      {user.username}
-                    </span>
-                  </div>
-                  <button
-                    className="bg-[#ef476f] text-white px-4 py-2 rounded-full font-bold hover:bg-[#e63946] transition-all duration-300 flex items-center space-x-2"
-                    onClick={() => handleSendRequest(user._id)}
-                    disabled={user.sent}
-                  >
-                    <AddUserIcon className="w-4 h-4" />
-                    {user.sent ? "Request Sent" : "Add Friend"}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+                  )}
+             </div>
 
-      <div className="bg-white rounded-3xl shadow-lg overflow-hidden">
-        {/* Tabs */}
-        <div
-          ref={tabsRef}
-          className="flex space-x-2 bg-gray-100 p-2 rounded-full mb-4"
-        >
-          <button
-            onClick={() => setActiveTab("all")}
-            className={`flex-1 px-6 py-3 text-lg font-bold rounded-full transition-all duration-300 ${
-              activeTab === "all"
-                ? "bg-white text-[#ef476f] shadow-md transform scale-105"
-                : "text-gray-600 hover:text-[#073b4c] hover:scale-105"
-            }`}
-          >
-            All ({friends.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("online")}
-            className={`flex-1 px-6 py-3 text-lg font-bold rounded-full transition-all duration-300 ${
-              activeTab === "online"
-                ? "bg-white text-[#ef476f] shadow-md transform scale-105"
-                : "text-gray-600 hover:text-[#073b4c] hover:scale-105"
-            }`}
-          >
-            Online ({onlineCount})
-          </button>
-          <button
-            onClick={() => setActiveTab("offline")}
-            className={`flex-1 px-6 py-3 text-lg font-bold rounded-full transition-all duration-300 ${
-              activeTab === "offline"
-                ? "bg-white text-[#ef476f] shadow-md transform scale-105"
-                : "text-gray-600 hover:text-[#073b4c] hover:scale-105"
-            }`}
-          >
-            Offline ({offlineCount})
-          </button>
-        </div>
-
-        {/* Friend Requests */}
-        {friendRequests.length > 0 && (
-          <div className="p-4 border-b border-gray-100">
-            <h3 className="text-lg font-bold mb-2 text-[#073b4c]">
-              Friend Requests
-            </h3>
-            <ul>
-              {friendRequests.map((user) => (
-                <li
-                  key={user._id}
-                  className="flex items-center justify-between py-2 border-b last:border-b-0"
-                >
-                  <div className="flex items-center space-x-3">
-                    {user.avatar && user.avatar.trim() !== "" ? (
-                      <img
-                        src={user.avatar}
-                        alt={user.username}
-                        className="w-10 h-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-2xl bg-gradient-to-br from-blue-400 to-purple-500">
-                        {user.firstName && user.firstName[0]
-                          ? user.firstName[0].toUpperCase()
-                          : user.username[0].toUpperCase()}
-                      </div>
-                    )}
-                    <span className="font-medium text-[#073b4c]">
-                      {user.username}
-                    </span>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button
-                      className="bg-[#06d6a0] text-white px-4 py-2 rounded-full font-bold hover:bg-[#05c293] transition-all duration-300 flex items-center space-x-2"
-                      onClick={() => handleAccept(user._id)}
-                    >
-                      <Check className="w-4 h-4" /> Accept
-                    </button>
-                    <button
-                      className="bg-gray-300 text-[#073b4c] px-4 py-2 rounded-full font-bold hover:bg-gray-400 transition-all duration-300 flex items-center space-x-2"
-                      onClick={() => handleReject(user._id)}
-                    >
-                      <X className="w-4 h-4" /> Reject
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* Sent Requests */}
-        {sentRequests.length > 0 && (
-          <div className="p-4 border-b border-gray-100">
-            <h3 className="text-lg font-bold mb-2 text-[#073b4c]">
-              Sent Requests
-            </h3>
-            <ul>
-              {sentRequests.map((user) => (
-                <li
-                  key={user._id}
-                  className="flex items-center justify-between py-2 border-b last:border-b-0"
-                >
-                  <div className="flex items-center space-x-3">
-                    {user.avatar && user.avatar.trim() !== "" ? (
-                      <img
-                        src={user.avatar}
-                        alt={user.username}
-                        className="w-10 h-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-2xl bg-gradient-to-br from-blue-400 to-purple-500">
-                        {user.firstName && user.firstName[0]
-                          ? user.firstName[0].toUpperCase()
-                          : user.username[0].toUpperCase()}
-                      </div>
-                    )}
-                    <span className="font-medium text-[#073b4c]">
-                      {user.username}
-                    </span>
-                  </div>
-                  <button
-                    className="bg-gray-300 text-[#073b4c] px-4 py-2 rounded-full font-bold hover:bg-gray-400 transition-all duration-300 flex items-center space-x-2"
-                    onClick={() => handleReject(user._id)}
-                  >
-                    <X className="w-4 h-4" /> Cancel
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* Friends List */}
-        <div ref={friendsListRef} className="divide-y divide-gray-100">
-          {loading ? (
-            <div className="p-16 text-center">Loading...</div>
-          ) : error ? (
-            <div className="p-16 text-center text-red-500">{error}</div>
-          ) : filteredFriends.length === 0 ? (
-            <div className="p-16 text-center">
-              <Users className="w-20 h-20 text-gray-300 mx-auto mb-6" />
-              <h3 className="text-2xl font-bold text-[#073b4c] mb-4">
-                No friends found
-              </h3>
-              <p className="text-gray-500 text-lg">
-                {searchTerm
-                  ? "Try adjusting your search terms"
-                  : "Start by adding some friends!"}
-              </p>
-            </div>
-          ) : (
-            filteredFriends.map((friend, index) => (
-              <div
-                key={friend._id}
-                className="friend-item p-8 hover:bg-gray-50 transition-all duration-300 cursor-pointer"
-                onMouseEnter={handleFriendHover}
-                onMouseLeave={handleFriendLeave}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-6">
-                    <div className="relative">
-                      {friend.avatar && friend.avatar.trim() !== "" ? (
-                        <img
-                          src={friend.avatar}
-                          alt={friend.username}
-                          className="w-16 h-16 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-2xl bg-gradient-to-br from-blue-400 to-purple-500">
-                          {friend.firstName && friend.firstName[0]
-                            ? friend.firstName[0].toUpperCase()
-                            : friend.username[0].toUpperCase()}
-                        </div>
+             {/* Requests */}
+             {(friendRequests.length > 0 || sentRequests.length > 0) && (
+                 <div className="bg-white/80 backdrop-blur-md rounded-[32px] p-6 border border-[#CAC4D0] shadow-sm animate-item">
+                      {friendRequests.length > 0 && (
+                          <div className="mb-6">
+                               <h3 className="text-sm font-bold text-[#6750A4] uppercase tracking-wider mb-3">Received Requests</h3>
+                               <div className="space-y-3">
+                                   {friendRequests.map(user => (
+                                       <div key={user._id} className="flex items-center justify-between p-3 rounded-2xl bg-[#F3EDF7]">
+                                           <div className="flex items-center gap-3">
+                                               <div className="w-8 h-8 rounded-full bg-[#6750A4] text-white flex items-center justify-center font-bold text-xs">
+                                                  {user.username.charAt(0).toUpperCase()}
+                                               </div>
+                                               <span className="text-sm font-bold text-[#1C1B1F]">{user.username}</span>
+                                           </div>
+                                           <div className="flex gap-1">
+                                                <button onClick={() => handleAccept(user._id)} className="p-1.5 bg-[#E6F4EA] text-[#0D652D] rounded-full hover:bg-[#C3EED0]"><Check size={14}/></button>
+                                                <button onClick={() => handleReject(user._id)} className="p-1.5 bg-[#FFDAD6] text-[#B3261E] rounded-full hover:bg-[#FFB4AB]"><X size={14}/></button>
+                                           </div>
+                                       </div>
+                                   ))}
+                               </div>
+                          </div>
                       )}
-                      <div
-                        className={`absolute -bottom-1 -right-1 w-5 h-5 ${getStatusColor(friend.status)} border-2 border-white rounded-full ${friend.status === "online" ? "animate-pulse" : ""}`}
-                      ></div>
+
+                      {sentRequests.length > 0 && (
+                          <div>
+                               <h3 className="text-sm font-bold text-[#6750A4] uppercase tracking-wider mb-3">Sent Requests</h3>
+                               <div className="space-y-3">
+                                   {sentRequests.map(user => (
+                                       <div key={user._id} className="flex items-center justify-between p-3 rounded-2xl bg-[#F3EDF7]/50 border border-[#E7E0EC]">
+                                           <div className="flex items-center gap-3 opacity-70">
+                                               <div className="w-8 h-8 rounded-full bg-[#E7E0EC] text-[#49454F] flex items-center justify-center font-bold text-xs">
+                                                  {user.username.charAt(0).toUpperCase()}
+                                               </div>
+                                               <span className="text-sm font-medium text-[#1C1B1F]">{user.username}</span>
+                                           </div>
+                                            <button onClick={() => handleReject(user._id)} className="p-1.5 text-[#49454F] hover:bg-[#E7E0EC] rounded-full"><X size={14}/></button>
+                                       </div>
+                                   ))}
+                               </div>
+                          </div>
+                      )}
+                 </div>
+             )}
+          </div>
+
+          {/* Right Column: Friends List */}
+          <div className="lg:col-span-2">
+               <div className="bg-white/80 backdrop-blur-md rounded-[32px] p-8 border border-[#CAC4D0] shadow-sm animate-item min-h-[600px]">
+                    <div className="flex items-center justify-between mb-8">
+                         <div>
+                             <h2 className="text-2xl font-bold text-[#1C1B1F] flex items-center gap-2">
+                                <Users size={28} className="text-[#6750A4]"/>
+                                My Friends
+                             </h2>
+                             <p className="text-[#49454F]">{friends.length} Friends</p>
+                         </div>
+                         
+                         <div className="bg-[#F3EDF7] p-1 rounded-full inline-flex">
+                             {(['all', 'online', 'offline'] as const).map((tab) => (
+                                 <button
+                                    key={tab}
+                                    onClick={() => setActiveTab(tab)}
+                                    className={`px-4 py-2 rounded-full text-sm font-bold capitalize transition-all ${
+                                        activeTab === tab 
+                                        ? "bg-white text-[#21005D] shadow-sm" 
+                                        : "text-[#49454F] hover:text-[#1C1B1F]"
+                                    }`}
+                                 >
+                                     {tab} {tab === 'online' && `(${onlineCount})`}
+                                 </button>
+                             ))}
+                         </div>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-[#073b4c] text-xl">
-                        {friend.username}
-                      </h3>
-                      <p className="text-gray-500 text-sm">
-                        {getStatusText(friend.status)}
-                      </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {loading && <p className="col-span-2 text-center py-10 text-[#49454F]">Loading friends...</p>}
+                        
+                        {!loading && filteredFriends.length === 0 && (
+                            <div className="col-span-2 text-center py-20 text-[#49454F]">
+                                <div className="w-16 h-16 bg-[#F3EDF7] rounded-full flex items-center justify-center mx-auto mb-4">
+                                     <Users size={32} className="opacity-50"/>
+                                </div>
+                                <p className="font-medium">No friends found.</p>
+                            </div>
+                        )}
+
+                        {filteredFriends.map(friend => (
+                            <div key={friend._id} className="group bg-white border border-[#E7E0EC] p-4 rounded-[24px] hover:shadow-md transition-shadow flex items-center gap-4 relative animate-item">
+                                 <div className="relative">
+                                     <div className="w-14 h-14 rounded-full bg-[#EADDFF] flex items-center justify-center text-[#21005D] font-bold text-xl">
+                                         {friend.avatar || friend.username.charAt(0).toUpperCase()}
+                                     </div>
+                                     <div className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-white ${getStatusColor(friend.status)}`} />
+                                 </div>
+                                 
+                                 <div className="flex-1">
+                                     <h3 className="font-bold text-[#1C1B1F] text-lg">{friend.username}</h3>
+                                     <p className="text-xs text-[#49454F] font-medium uppercase tracking-wide">{getStatusText(friend.status)}</p>
+                                 </div>
+
+                                 <button 
+                                    onClick={() => handleRemove(friend._id)}
+                                    className="opacity-0 group-hover:opacity-100 p-2 text-[#B3261E] hover:bg-[#FFDAD6] rounded-full transition-all"
+                                    title="Remove Friend"
+                                 >
+                                     <X size={18} />
+                                 </button>
+                            </div>
+                        ))}
                     </div>
-                  </div>
-                  <div className="flex items-center space-x-2 ml-8">
-                    <button
-                      className="bg-gray-200 text-[#ef476f] px-4 py-2 rounded-full font-bold hover:bg-gray-300 transition-all duration-300 flex items-center space-x-2"
-                      onClick={() => handleRemove(friend._id)}
-                    >
-                      <X className="w-4 h-4" /> Remove
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+               </div>
+          </div>
       </div>
     </div>
   );
